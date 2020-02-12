@@ -72,8 +72,9 @@ How?
 The goal of the rewrite is the following:
 
  - Rewrite the grammar in such a way that it becomes a proper superset of the
-   existing grammar and the documentation (that is, it must accept all
-   previously accepted input), without accepting programs that were reasonably
+   intended features of the existing grammar and the documentation (that is, it
+   must accept all previously accepted input, unintended things like that
+   version number example aside), without accepting programs that were reasonably
    rejected by the previous version (that is, no language features are added).
 
  - Properly document the grammar specification-style instead of paper-style.
