@@ -1,19 +1,22 @@
 %define api.pure full
 %locations
-%param { yyscan_t scanner }
 
 %code requires {
     #include <memory>
     #include <cstdio>
     #include "cqasm-ast.hpp"
+    #include "cqasm-analyzer.hpp"
     using namespace cqasm::ast;
     typedef void* yyscan_t;
 }
 
 %code {
     int yylex(YYSTYPE* yylvalp, YYLTYPE* yyllocp, yyscan_t scanner);
-    void yyerror(YYLTYPE* yyllocp, yyscan_t unused, const char* msg);
+    void yyerror(YYLTYPE* yyllocp, yyscan_t scanner, cqasm::Analyzer &analyzer, const char* msg);
 }
+
+%param { yyscan_t scanner }
+%parse-param { cqasm::Analyzer &analyzer }
 
 /* YYSTYPE union */
 %union {
@@ -319,6 +322,6 @@ Root            : Program                                                       
 
 %%
 
-void yyerror(YYLTYPE* yyllocp, yyscan_t unused, const char* msg) {
-    std::fprintf(stderr, "[%d:%d]: %s\n", yyllocp->first_line, yyllocp->first_column, msg);
+void yyerror(YYLTYPE* yyllocp, yyscan_t unused, cqasm::Analyzer &analyzer, const char* msg) {
+    analyzer.push_error(std::string(msg));
 }

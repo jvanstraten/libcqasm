@@ -35,6 +35,7 @@ flex_target(
     cqasm-lexer
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-lexer.l"
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-lexer.cpp"
+    DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/cqasm-lexer.hpp"
 )
 
 # Generate the parser.
@@ -56,6 +57,8 @@ add_library(
     ${BISON_cqasm-parser_OUTPUTS}
     ${FLEX_cqasm-lexer_OUTPUTS}
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-ast.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-analyzer.cpp"
 )
 
 # The src directory and binary directory (for generated header files) are

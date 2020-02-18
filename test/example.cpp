@@ -1,16 +1,10 @@
 #include <gtest/gtest.h> // googletest header file
 
-#include <string>
-using std::string;
+#include <cqasm.hpp>
 
-const char *actualValTrue  = "hello gtest";
-const char *actualValFalse = "hello world";
-const char *expectVal      = "hello gtest";
-
-TEST(StrCompare, CStrEqual) {
-    EXPECT_STREQ(expectVal, actualValTrue);
-}
-
-TEST(StrCompare, CStrNotEqual) {
-    EXPECT_STREQ(expectVal, actualValFalse);
+TEST(test, test) {
+  auto a = cqasm::Analyzer("grover.cq");
+  for (auto err : a.errors) {
+    EXPECT_EQ(err, "");
+  }
 }
