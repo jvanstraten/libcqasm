@@ -12,11 +12,11 @@
 
 %code {
     int yylex(YYSTYPE* yylvalp, YYLTYPE* yyllocp, yyscan_t scanner);
-    void yyerror(YYLTYPE* yyllocp, yyscan_t scanner, cqasm::Analyzer &analyzer, const char* msg);
+    void yyerror(YYLTYPE* yyllocp, yyscan_t scanner, cqasm::AnalyzerInternals &analyzer, const char* msg);
 }
 
 %param { yyscan_t scanner }
-%parse-param { cqasm::Analyzer &analyzer }
+%parse-param { cqasm::AnalyzerInternals &analyzer }
 
 /* YYSTYPE union */
 %union {
@@ -33,12 +33,12 @@
     IndexRange      *idxr;
     IndexEntry      *idxe;
     IndexList       *idxl;
+    MatrixLiteral1  *mat1;
+    MatrixLiteral2  *mat2;
     MatrixLiteral   *mat;
     StringBuilder   *strb;
     StringLiteral   *slit;
     JsonLiteral     *jlit;
-    Operand         *oper;
-    OperandList     *opl;
     AnnotationData  *adat;
     Instruction     *inst;
     Bundle          *bun;
@@ -48,7 +48,6 @@
     StatementList   *stms;
     Version         *vers;
     Program         *prog;
-    Root            *root;
 };
 
 /* Typenames for nonterminals */
@@ -64,14 +63,14 @@
 %type <idxr> IndexRange
 %type <idxe> IndexEntry
 %type <idxl> IndexList
-%type <mat>  MatrixLiteral2 MatrixLiteral
+%type <mat1> MatrixLiteral1
+%type <mat2> MatrixLiteral2 MatrixLiteral2c
+%type <mat>  MatrixLiteral
 %type <strb> StringBuilder
 %type <slit> StringLiteral
 %type <jlit> JsonLiteral
-%type <oper> Operand
-%type <opl>  OperandList
 %type <adat> AnnotationName AnnotationData
-%type <inst> InstrType Instruction AnnotInstr
+%type <inst> Instruction AnnotInstr
 %type <bun>  SLParInstrList CBParInstrList
 %type <map>  Mapping
 %type <sub>  Subcircuit
@@ -79,7 +78,6 @@
 %type <stms> StatementList
 %type <vers> Version
 %type <prog> Program
-%type <root> Root
 
 /* Whitespace management */
 %token NEWLINE
@@ -103,7 +101,7 @@
 %token <str> STRBUILD_APPEND STRBUILD_ESCAPE
 
 /* Matrix literals */
-%token MATRIX_OPEN MATRIX_CLOSE
+%token MAT_OPEN MAT_CLOSE
 
 /* Identifiers */
 %token <str> IDENTIFIER
@@ -154,59 +152,23 @@ FloatLiteral    : FLOAT_LITERAL                                                 
 Identifier      : IDENTIFIER                                                    { $$ = new Identifier(); $$->name = std::string($1); std::free($1); }
                 ;
 
-/* Array/register indexation. */
-Index           : Expression '[' IndexList ']'                                  { $$ = new Index(); $$->expr.set_raw($1); $$->indices.set_raw($3); }
+/* Old matrix syntax, specified as a row-major flattened list of the
+real/imaginary value pairs.*/
+MatrixLiteral1  : '[' ExpressionList ']'                                        { $$ = new MatrixLiteral1(); $$->pairs.set_raw($2); }
                 ;
 
-/* Math operations, evaluated by the parser. */
-UnaryOp         : '-' Expression %prec UMINUS                                   { $$ = new Negate(); $$->expr.set_raw($2); }
+/* Mew matrix syntax with explitic structure and using expressions for
+representing the complex numbers. */
+MatrixLiteral2c : MatrixLiteral2c Newline ExpressionList                        { $$ = $1; $$->rows.add_raw($3); }
+                | ExpressionList                                                { $$ = new MatrixLiteral2(); $$->rows.add_raw($1); }
                 ;
 
-BinaryOp        : Expression '*' Expression                                     { $$ = new Multiply(); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
-                | Expression '+' Expression                                     { $$ = new Add();      $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
-                | Expression '-' Expression                                     { $$ = new Subtract(); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+MatrixLiteral2  : MAT_OPEN OptNewline MatrixLiteral2c OptNewline MAT_CLOSE      { $$ = $3; }
                 ;
 
-
-/* Supported types of expressions. */
-Expression      : IntegerLiteral                                                { $$ = $1; }
-                | FloatLiteral                                                  { $$ = $1; }
-                | Identifier                                                    { $$ = $1; }
-                | Index                                                         { $$ = $1; }
-                | '(' Expression ')'                                            { $$ = $2; }
-                | '+' Expression %prec UPLUS                                    { $$ = $2; }
-                | UnaryOp                                                       { $$ = $1; }
-                | BinaryOp                                                      { $$ = $1; }
-                | error                                                         { $$ = new ErroneousExpression(); }
-                ;
-
-/* List of one or more expressions. */
-ExpressionList  : ExpressionList ',' Expression                                 { $$ = $1; $$->items.add_raw($3); }
-                | Expression %prec ','                                          { $$ = new ExpressionList(); $$->items.add_raw($1); }
-                ;
-
-/* Indexation modes. */
-IndexItem       : Expression                                                    { $$ = new IndexItem(); $$->index.set_raw($1); }
-                ;
-
-IndexRange      : Expression ':' Expression                                     { $$ = new IndexRange(); $$->start.set_raw($1); $$->end.set_raw($3); }
-                ;
-
-IndexEntry      : IndexItem                                                     { $$ = $1; }
-                | IndexRange                                                    { $$ = $1; }
-                ;
-
-IndexList       : IndexList ',' IndexEntry                                      { $$ = $1; $$->items.add_raw($3); }
-                | IndexEntry                                                    { $$ = new IndexList(); $$->items.add_raw($1); }
-                ;
-
-/* Matrix syntax, used to describe custom gates. */
-MatrixLiteral2  : MatrixLiteral2 Newline ExpressionList                         { $$ = $1; $$->items.add_raw($3); }
-                | ExpressionList                                                { $$ = new MatrixLiteral(); $$->items.add_raw($1); }
-                ;
-
-MatrixLiteral   : MATRIX_OPEN OptNewline MatrixLiteral2 OptNewline MATRIX_CLOSE { $$ = $3; }
-                | '[' ExpressionList ']'                                        { $$ = new MatrixLiteral(); $$->set_raw_square_pairs($2); }
+/* Either matrix syntax. */
+MatrixLiteral   : MatrixLiteral1                                                { $$ = $1; }
+                | MatrixLiteral2                                                { $$ = $1; }
                 ;
 
 /* String builder. This accumulates JSON/String data, mostly
@@ -224,17 +186,52 @@ StringLiteral   : STRING_OPEN StringBuilder STRING_CLOSE                        
 JsonLiteral     : JSON_OPEN StringBuilder JSON_CLOSE                            { $$ = new JsonLiteral(); $$->value = $2->stream.str(); delete $2; }
                 ;
 
-/* Operands in cQASM can be expressions, strings (for print and error), or
-matrices (for the U gate). */
-Operand         : Expression %prec BUNDLE                                       { $$ = $1; }
+/* Array/register indexation. */
+Index           : Expression '[' IndexList ']'                                  { $$ = new Index(); $$->expr.set_raw($1); $$->indices.set_raw($3); }
+                ;
+
+/* Math operations, evaluated by the parser. */
+UnaryOp         : '-' Expression %prec UMINUS                                   { $$ = new Negate(); $$->expr.set_raw($2); }
+                ;
+
+BinaryOp        : Expression '*' Expression                                     { $$ = new Multiply(); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+                | Expression '+' Expression                                     { $$ = new Add();      $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+                | Expression '-' Expression                                     { $$ = new Subtract(); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+                ;
+
+/* Supported types of expressions. */
+Expression      : IntegerLiteral                                                { $$ = $1; }
+                | FloatLiteral                                                  { $$ = $1; }
+                | Identifier                                                    { $$ = $1; }
                 | MatrixLiteral                                                 { $$ = $1; }
                 | StringLiteral                                                 { $$ = $1; }
                 | JsonLiteral                                                   { $$ = $1; }
+                | Index                                                         { $$ = $1; }
+                | '(' Expression ')'                                            { $$ = $2; }
+                | '+' Expression %prec UPLUS                                    { $$ = $2; }
+                | UnaryOp                                                       { $$ = $1; }
+                | BinaryOp                                                      { $$ = $1; }
+                | error                                                         { $$ = new ErroneousExpression(); }
                 ;
 
-/* List of operands. */
-OperandList     : OperandList ',' Operand                                       { $$ = $1; $$->items.add_raw($3); }
-                | Operand %prec ','                                             { $$ = new OperandList(); $$->items.add_raw($1); }
+/* List of one or more expressions. */
+ExpressionList  : ExpressionList ',' Expression                                 { $$ = $1; $$->items.add_raw($3); }
+                | Expression %prec ','                                          { $$ = new ExpressionList(); $$->items.add_raw($1); }
+                ;
+
+/* Indexation modes. */
+IndexItem       : Expression                                                    { $$ = new IndexItem(); $$->index.set_raw($1); }
+                ;
+
+IndexRange      : Expression ':' Expression                                     { $$ = new IndexRange(); $$->first.set_raw($1); $$->last.set_raw($3); }
+                ;
+
+IndexEntry      : IndexItem                                                     { $$ = $1; }
+                | IndexRange                                                    { $$ = $1; }
+                ;
+
+IndexList       : IndexList ',' IndexEntry                                      { $$ = $1; $$->items.add_raw($3); }
+                | IndexEntry                                                    { $$ = new IndexList(); $$->items.add_raw($1); }
                 ;
 
 /* The information caried by an annotation or pragma statement. */
@@ -243,18 +240,15 @@ AnnotationName  : Identifier '.' Identifier                                     
 
 AnnotationData  : AnnotationName                                                { $$ = $1; }
                 | AnnotationName '(' ')'                                        { $$ = $1; }
-                | AnnotationName '(' OperandList ')'                            { $$ = $1; $$->operands.set_raw($3); }
-                ;
-
-/* Name for gates, with optional conditional syntax. */
-InstrType       : Identifier                                                    { $$ = new Instruction(); $$->name.set_raw($1); }
-                | CDASH Identifier Expression ','                               { $$ = new Instruction(); $$->name.set_raw($2); $$->condition.set_raw($3); }
+                | AnnotationName '(' ExpressionList ')'                         { $$ = $1; $$->operands.set_raw($3); }
                 ;
 
 /* Instructions. Note that this is NOT directly a statement grammatically;
-they are first made part of a bundle. */
-Instruction     : InstrType                                                     { $$ = $1; }
-                | InstrType OperandList                                         { $$ = $1; $$->operands.set_raw($2); }
+they are always part of a bundle. */
+Instruction     : Identifier                                                    { $$ = new Instruction(); $$->name.set_raw($1); $$->operands.set_raw(new ExpressionList()); }
+                | Identifier ExpressionList                                     { $$ = new Instruction(); $$->name.set_raw($1); $$->operands.set_raw($2); }
+                | CDASH Identifier Expression                                   { $$ = new Instruction(); $$->name.set_raw($2); $$->condition.set_raw($3); $$->operands.set_raw(new ExpressionList()); }
+                | CDASH Identifier Expression ',' ExpressionList                { $$ = new Instruction(); $$->name.set_raw($2); $$->condition.set_raw($3); $$->operands.set_raw($5); }
                 ;
 
 /* Instructions are not statements (because there can be multiple bundled
@@ -316,12 +310,17 @@ Program         : OptNewline VERSION Version Newline
                 ;
 
 /* Toplevel. */
-Root            : Program                                                       { $$ = $1; }
-                | error                                                         { $$ = new ErroneousProgram(); }
+Root            : Program                                                       { analyzer.result.ast_root.set_raw($1); }
+                | error                                                         { analyzer.result.ast_root.set_raw(new ErroneousProgram()); }
                 ;
 
 %%
 
-void yyerror(YYLTYPE* yyllocp, yyscan_t unused, cqasm::Analyzer &analyzer, const char* msg) {
-    analyzer.push_error(std::string(msg));
+void yyerror(YYLTYPE* yyllocp, yyscan_t unused, cqasm::AnalyzerInternals &analyzer, const char* msg) {
+    std::ostringstream sb;
+    sb << analyzer.result.filename
+       << ":"  << yyllocp->first_line
+       << ":"  << yyllocp->first_column
+       << ": " << msg;
+    analyzer.push_error(sb.str());
 }

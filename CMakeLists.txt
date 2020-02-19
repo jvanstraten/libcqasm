@@ -51,6 +51,31 @@ add_flex_bison_dependency(
     cqasm-parser
 )
 
+# Generate the AST nodes.
+add_executable(
+    ast-gen
+    EXCLUDE_FROM_ALL
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ast-gen/ast.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ast-gen/ast-gen.cpp"
+)
+
+target_include_directories(
+    ast-gen
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/ast-gen"
+)
+
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include")
+
+add_custom_command(
+    OUTPUT
+        "${CMAKE_CURRENT_BINARY_DIR}/include/cqasm-ast-gen.hpp"
+        "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
+    COMMAND
+        ast-gen
+        "${CMAKE_CURRENT_BINARY_DIR}/include/cqasm-ast-gen.hpp"
+        "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
+)
+
 # Main cQASM library.
 add_library(
     cqasm
@@ -58,6 +83,7 @@ add_library(
     ${FLEX_cqasm-lexer_OUTPUTS}
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-ast.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-analyzer.cpp"
 )
 
@@ -70,6 +96,7 @@ target_include_directories(
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/include"
 )
 
 # Add the test directory.

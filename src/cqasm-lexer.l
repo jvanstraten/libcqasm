@@ -3,8 +3,10 @@
 %option reentrant bison-bridge bison-locations
 
 %{
-/*     #include "cqasm2/ast/ast.hpp" */
     #include "cqasm-parser.hpp"
+
+    #define DEBUG(...) fprintf(stderr, __VA_ARGS__)
+
     #define YY_USER_ACTION yylloc->last_column += yyleng;
     #define LOCATION_RESET \
         yylloc->first_column = 1; yylloc->first_line = 1; \
@@ -15,22 +17,23 @@
         yylloc->first_column = yylloc->last_column; \
         yylloc->first_line = yylloc->last_line;
     #define WITH_STR(TOKNAME) \
-        /*printf("Pushing %s token starting at %d:%d\n", #TOKNAME, yylloc->first_line, yylloc->first_column);*/ \
+        DEBUG("Pushing %s token (%s) starting at %d:%d\n", #TOKNAME, yytext, yylloc->first_line, yylloc->first_column); \
         yylval->str = strdup(yytext); return TOKNAME
     #define WITHOUT_STR(TOKNAME) \
-        /*printf("Pushing %s token starting at %d:%d\n", #TOKNAME, yylloc->first_line, yylloc->first_column);*/ \
+        DEBUG("Pushing %s token starting at %d:%d\n", #TOKNAME, yylloc->first_line, yylloc->first_column); \
         return TOKNAME
     #define OPERATOR \
-        /*printf("Pushing %s token starting at %d:%d\n", yytext, yylloc->first_line, yylloc->first_column);*/ \
+        DEBUG("Pushing '%c' token starting at %d:%d\n", yytext[0], yylloc->first_line, yylloc->first_column); \
         return yytext[0]
     #define DELETE LOCATION_STEP
 %}
 
-%x MULTILINE_COMMENT
-%x VERSION
-%x STRING
-%x JSON
-%x JSONSTRING
+%x MODE_MULTILINE_COMMENT
+%x MODE_VERSION
+%x MODE_STRING
+%x MODE_JSON
+%x MODE_JSON_STRING
+
 %%
 
 %{
@@ -56,9 +59,9 @@
     /* Gobble up comments */
     /* TODO: error on EOF within comment mode */
 #.*                                                 DELETE;
-"/*"                                                BEGIN(MULTILINE_COMMENT); DELETE;
+"/*"                                                BEGIN(MODE_MULTILINE_COMMENT); DELETE;
 }
-<MULTILINE_COMMENT>{
+<MODE_MULTILINE_COMMENT>{
 "*/"                                                BEGIN(INITIAL); DELETE;
 (\n|\r\n?)                                          LOCATION_LINE; DELETE;
 .                                                   DELETE;
@@ -75,9 +78,9 @@
     /*=======================================================================*/
 
     /* This is treated separately to avoid conflicts with float literals */
-(?i:version)                                        BEGIN(VERSION); WITHOUT_STR(VERSION);
+(?i:version)                                        BEGIN(MODE_VERSION); WITHOUT_STR(VERSION);
 }
-<VERSION>{
+<MODE_VERSION>{
 (\n|\r\n?)                                          LOCATION_LINE; BEGIN(INITIAL); WITHOUT_STR(NEWLINE);
 [ \t]+                                              DELETE;
 [0-9]+                                              WITH_STR(INT_LITERAL);
@@ -118,9 +121,9 @@
     /* STRING LITERALS                                                       */
     /*=======================================================================*/
 
-["]                                                 BEGIN(STRING); WITHOUT_STR(STRING_OPEN);
+["]                                                 BEGIN(MODE_STRING); WITHOUT_STR(STRING_OPEN);
 }
-<STRING>{
+<MODE_STRING>{
 ["]                                                 BEGIN(INITIAL); WITHOUT_STR(STRING_CLOSE);
 [\\][tn'"\\]                                        WITH_STR(STRBUILD_ESCAPE);
 [\\](\n|\r\n?)                                      LOCATION_LINE; DELETE;
@@ -134,16 +137,16 @@
     /* JSON LITERALS                                                         */
     /*=======================================================================*/
 
-"{|"                                                BEGIN(JSON); WITHOUT_STR(JSON_OPEN);
+"{|"                                                BEGIN(MODE_JSON); WITHOUT_STR(JSON_OPEN);
 }
-<JSON>{
+<MODE_JSON>{
 "|}"                                                BEGIN(INITIAL); WITHOUT_STR(JSON_CLOSE);
-["]                                                 BEGIN(JSONSTRING); WITH_STR(STRBUILD_APPEND);
+["]                                                 BEGIN(MODE_JSON_STRING); WITH_STR(STRBUILD_APPEND);
 (\n|\r\n?)                                          LOCATION_LINE; WITH_STR(STRBUILD_APPEND);
 .                                                   WITH_STR(STRBUILD_APPEND);
 }
-<JSONSTRING>{
-["]                                                 BEGIN(JSON); WITH_STR(STRBUILD_APPEND);
+<MODE_JSON_STRING>{
+["]                                                 BEGIN(MODE_JSON); WITH_STR(STRBUILD_APPEND);
 [\\].                                               WITH_STR(STRBUILD_APPEND);
 (\n|\r\n?)                                          LOCATION_LINE; WITH_STR(STRBUILD_APPEND);
 .                                                   WITH_STR(STRBUILD_APPEND);
@@ -155,8 +158,8 @@
     /* MATRIX LITERALS                                                       */
     /*=======================================================================*/
 
-"[|"                                                WITHOUT_STR(MATRIX_OPEN);
-"|]"                                                WITHOUT_STR(MATRIX_CLOSE);
+"[|"                                                WITHOUT_STR(MAT_OPEN);
+"|]"                                                WITHOUT_STR(MAT_CLOSE);
 
 
     /*=======================================================================*/
@@ -170,7 +173,7 @@
     /* OPERATORS                                                             */
     /*=======================================================================*/
 
-[()[\]{}+\-*:,.@]                                   OPERATOR;
+[()[\]{}|+\-*:,.@]                                   OPERATOR;
 
 
     /*=======================================================================*/
