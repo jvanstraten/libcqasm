@@ -4,6 +4,7 @@
 %code requires {
     #include <memory>
     #include <cstdio>
+    #include <cstdint>
     #include "cqasm-ast.hpp"
     #include "cqasm-analyzer.hpp"
     using namespace cqasm::ast;
@@ -13,6 +14,34 @@
 %code {
     int yylex(YYSTYPE* yylvalp, YYLTYPE* yyllocp, yyscan_t scanner);
     void yyerror(YYLTYPE* yyllocp, yyscan_t scanner, cqasm::AnalyzerInternals &analyzer, const char* msg);
+}
+
+%code top {
+    #define ADD_SOURCE_LOCATION(v)          \
+        v->set_annotation(SourceLocation(   \
+            analyzer.result.filename,       \
+            yyloc.first_line,               \
+            yyloc.first_column,             \
+            yyloc.last_line,                \
+            yyloc.last_column))
+
+
+    #define NEW(v, T)           \
+        v = new T();            \
+        ADD_SOURCE_LOCATION(v)
+
+    #define FROM(t, s)                                                          \
+        t = s;                                                                  \
+        {                                                                       \
+            SourceLocation *loc = t->get_annotation<SourceLocation>();          \
+            if (!loc) {                                                         \
+                ADD_SOURCE_LOCATION(t);                                         \
+            } else {                                                            \
+                loc->expand_to_include(yyloc.first_line, yyloc.first_column);   \
+                loc->expand_to_include(yyloc.last_line, yyloc.last_column);     \
+            }                                                                   \
+        }
+
 }
 
 %param { yyscan_t scanner }
@@ -111,8 +140,8 @@
 /* Multi-character operators */
 %token POWER
 
-/* Illegal character */
-%token BAD_CHARACTER
+/* Error marker tokens */
+%token BAD_CHARACTER UNEXPECTED_EOF
 
 /* Associativity rules for static expressions. The lowest precedence level
 comes first. NOTE: expression precedence must match the values in
@@ -148,178 +177,178 @@ OptNewline      : Newline
                 ;
 
 /* Integer literals. */
-IntegerLiteral  : INT_LITERAL                                                   { $$ = new IntegerLiteral(); $$->value = std::strtol($1, nullptr, 0); std::free($1); }
+IntegerLiteral  : INT_LITERAL                                                   { NEW($$, IntegerLiteral); $$->value = std::strtol($1, nullptr, 0); std::free($1); }
                 ;
 
 /* Floating point literals. */
-FloatLiteral    : FLOAT_LITERAL                                                 { $$ = new FloatLiteral(); $$->value = std::strtod($1, nullptr); std::free($1); }
+FloatLiteral    : FLOAT_LITERAL                                                 { NEW($$, FloatLiteral); $$->value = std::strtod($1, nullptr); std::free($1); }
                 ;
 
 /* Old matrix syntax, specified as a row-major flattened list of the
 real/imaginary value pairs.*/
-MatrixLiteral1  : '[' ExpressionList ']'                                        { $$ = new MatrixLiteral1(); $$->pairs.set_raw($2); }
+MatrixLiteral1  : '[' ExpressionList ']'                                        { NEW($$, MatrixLiteral1); $$->pairs.set_raw($2); }
                 ;
 
 /* Mew matrix syntax with explitic structure and using expressions for
 representing the complex numbers. */
-MatrixLiteral2c : MatrixLiteral2c Newline ExpressionList                        { $$ = $1; $$->rows.add_raw($3); }
-                | ExpressionList                                                { $$ = new MatrixLiteral2(); $$->rows.add_raw($1); }
+MatrixLiteral2c : MatrixLiteral2c Newline ExpressionList                        { FROM($$, $1); $$->rows.add_raw($3); }
+                | ExpressionList                                                { NEW($$, MatrixLiteral2); $$->rows.add_raw($1); }
                 ;
 
-MatrixLiteral2  : MAT_OPEN OptNewline MatrixLiteral2c OptNewline MAT_CLOSE      { $$ = $3; }
+MatrixLiteral2  : MAT_OPEN OptNewline MatrixLiteral2c OptNewline MAT_CLOSE      { FROM($$, $3); }
                 ;
 
 /* Either matrix syntax. */
-MatrixLiteral   : MatrixLiteral1                                                { $$ = $1; }
-                | MatrixLiteral2                                                { $$ = $1; }
+MatrixLiteral   : MatrixLiteral1                                                { FROM($$, $1); }
+                | MatrixLiteral2                                                { FROM($$, $1); }
                 ;
 
 /* String builder. This accumulates JSON/String data, mostly
 character-by-character. */
-StringBuilder   : StringBuilder STRBUILD_APPEND                                 { $$ = $1; $$->push_string(std::string($2)); std::free($2); }
-                | StringBuilder STRBUILD_ESCAPE                                 { $$ = $1; $$->push_escape(std::string($2)); std::free($2); }
-                |                                                               { $$ = new StringBuilder(); }
+StringBuilder   : StringBuilder STRBUILD_APPEND                                 { FROM($$, $1); $$->push_string(std::string($2)); std::free($2); }
+                | StringBuilder STRBUILD_ESCAPE                                 { FROM($$, $1); $$->push_escape(std::string($2)); std::free($2); }
+                |                                                               { NEW($$, StringBuilder); }
                 ;
 
 /* String literal. */
-StringLiteral   : STRING_OPEN StringBuilder STRING_CLOSE                        { $$ = new StringLiteral(); $$->value = $2->stream.str(); delete $2; }
+StringLiteral   : STRING_OPEN StringBuilder STRING_CLOSE                        { NEW($$, StringLiteral); $$->value = $2->stream.str(); delete $2; }
                 ;
 
 /* JSON literal. */
-JsonLiteral     : JSON_OPEN StringBuilder JSON_CLOSE                            { $$ = new JsonLiteral(); $$->value = $2->stream.str(); delete $2; }
+JsonLiteral     : JSON_OPEN StringBuilder JSON_CLOSE                            { NEW($$, JsonLiteral); $$->value = $2->stream.str(); delete $2; }
                 ;
 
 /* Identifiers. */
-Identifier      : IDENTIFIER                                                    { $$ = new Identifier(); $$->name = std::string($1); std::free($1); }
+Identifier      : IDENTIFIER                                                    { NEW($$, Identifier); $$->name = std::string($1); std::free($1); }
                 ;
 
 /* Function calls. */
-FunctionCall    : Identifier '(' ExpressionList ')' %prec '('                   { $$ = new FunctionCall(); $$->name.set_raw($1); $$->arguments.set_raw($3); }
+FunctionCall    : Identifier '(' ExpressionList ')' %prec '('                   { NEW($$, FunctionCall); $$->name.set_raw($1); $$->arguments.set_raw($3); }
                 ;
 
 /* Array/register indexation. */
-Index           : Expression '[' IndexList ']'                                  { $$ = new Index(); $$->expr.set_raw($1); $$->indices.set_raw($3); }
+Index           : Expression '[' IndexList ']'                                  { NEW($$, Index); $$->expr.set_raw($1); $$->indices.set_raw($3); }
                 ;
 
 /* Math operations, evaluated by the parser. */
-UnaryOp         : '-' Expression %prec UMINUS                                   { $$ = new Negate(); $$->expr.set_raw($2); }
+UnaryOp         : '-' Expression %prec UMINUS                                   { NEW($$, Negate); $$->expr.set_raw($2); }
                 ;
 
-BinaryOp        : Expression POWER Expression                                   { $$ = new Power();    $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
-                | Expression '*' Expression                                     { $$ = new Multiply(); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
-                | Expression '/' Expression                                     { $$ = new Divide();   $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
-                | Expression '+' Expression                                     { $$ = new Add();      $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
-                | Expression '-' Expression                                     { $$ = new Subtract(); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+BinaryOp        : Expression POWER Expression                                   { NEW($$, Power);    $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+                | Expression '*' Expression                                     { NEW($$, Multiply); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+                | Expression '/' Expression                                     { NEW($$, Divide);   $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+                | Expression '+' Expression                                     { NEW($$, Add);      $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+                | Expression '-' Expression                                     { NEW($$, Subtract); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
                 ;
 
 /* Supported types of expressions. */
-Expression      : IntegerLiteral                                                { $$ = $1; }
-                | FloatLiteral                                                  { $$ = $1; }
-                | MatrixLiteral                                                 { $$ = $1; }
-                | StringLiteral                                                 { $$ = $1; }
-                | JsonLiteral                                                   { $$ = $1; }
-                | Identifier                                                    { $$ = $1; }
-                | FunctionCall                                                  { $$ = $1; }
-                | Index                                                         { $$ = $1; }
-                | UnaryOp                                                       { $$ = $1; }
-                | BinaryOp                                                      { $$ = $1; }
-                | '(' Expression ')'                                            { $$ = $2; }
-                | error                                                         { $$ = new ErroneousExpression(); }
+Expression      : IntegerLiteral                                                { FROM($$, $1); }
+                | FloatLiteral                                                  { FROM($$, $1); }
+                | MatrixLiteral                                                 { FROM($$, $1); }
+                | StringLiteral                                                 { FROM($$, $1); }
+                | JsonLiteral                                                   { FROM($$, $1); }
+                | Identifier                                                    { FROM($$, $1); }
+                | FunctionCall                                                  { FROM($$, $1); }
+                | Index                                                         { FROM($$, $1); }
+                | UnaryOp                                                       { FROM($$, $1); }
+                | BinaryOp                                                      { FROM($$, $1); }
+                | '(' Expression ')'                                            { FROM($$, $2); }
+                | error                                                         { NEW($$, ErroneousExpression); }
                 ;
 
 /* List of one or more expressions. */
-ExpressionList  : ExpressionList ',' Expression                                 { $$ = $1; $$->items.add_raw($3); }
-                | Expression %prec ','                                          { $$ = new ExpressionList(); $$->items.add_raw($1); }
+ExpressionList  : ExpressionList ',' Expression                                 { FROM($$, $1); $$->items.add_raw($3); }
+                | Expression %prec ','                                          { NEW($$, ExpressionList); $$->items.add_raw($1); }
                 ;
 
 /* Indexation modes. */
-IndexItem       : Expression                                                    { $$ = new IndexItem(); $$->index.set_raw($1); }
+IndexItem       : Expression                                                    { NEW($$, IndexItem); $$->index.set_raw($1); }
                 ;
 
-IndexRange      : Expression ':' Expression                                     { $$ = new IndexRange(); $$->first.set_raw($1); $$->last.set_raw($3); }
+IndexRange      : Expression ':' Expression                                     { NEW($$, IndexRange); $$->first.set_raw($1); $$->last.set_raw($3); }
                 ;
 
-IndexEntry      : IndexItem                                                     { $$ = $1; }
-                | IndexRange                                                    { $$ = $1; }
+IndexEntry      : IndexItem                                                     { FROM($$, $1); }
+                | IndexRange                                                    { FROM($$, $1); }
                 ;
 
-IndexList       : IndexList ',' IndexEntry                                      { $$ = $1; $$->items.add_raw($3); }
-                | IndexEntry                                                    { $$ = new IndexList(); $$->items.add_raw($1); }
+IndexList       : IndexList ',' IndexEntry                                      { FROM($$, $1); $$->items.add_raw($3); }
+                | IndexEntry                                                    { NEW($$, IndexList); $$->items.add_raw($1); }
                 ;
 
 /* The information caried by an annotation or pragma statement. */
-AnnotationName  : Identifier '.' Identifier                                     { $$ = new AnnotationData(); $$->interface.set_raw($1); $$->operation.set_raw($1); }
+AnnotationName  : Identifier '.' Identifier                                     { NEW($$, AnnotationData); $$->interface.set_raw($1); $$->operation.set_raw($1); }
                 ;
 
-AnnotationData  : AnnotationName                                                { $$ = $1; }
-                | AnnotationName '(' ')'                                        { $$ = $1; }
-                | AnnotationName '(' ExpressionList ')'                         { $$ = $1; $$->operands.set_raw($3); }
+AnnotationData  : AnnotationName                                                { FROM($$, $1); }
+                | AnnotationName '(' ')'                                        { FROM($$, $1); }
+                | AnnotationName '(' ExpressionList ')'                         { FROM($$, $1); $$->operands.set_raw($3); }
                 ;
 
 /* Instructions. Note that this is NOT directly a statement grammatically;
 they are always part of a bundle. */
-Instruction     : Identifier                                                    { $$ = new Instruction(); $$->name.set_raw($1); $$->operands.set_raw(new ExpressionList()); }
-                | Identifier ExpressionList                                     { $$ = new Instruction(); $$->name.set_raw($1); $$->operands.set_raw($2); }
-                | CDASH Identifier Expression                                   { $$ = new Instruction(); $$->name.set_raw($2); $$->condition.set_raw($3); $$->operands.set_raw(new ExpressionList()); }
-                | CDASH Identifier Expression ',' ExpressionList                { $$ = new Instruction(); $$->name.set_raw($2); $$->condition.set_raw($3); $$->operands.set_raw($5); }
+Instruction     : Identifier                                                    { NEW($$, Instruction); $$->name.set_raw($1); $$->operands.set_raw(new ExpressionList()); }
+                | Identifier ExpressionList                                     { NEW($$, Instruction); $$->name.set_raw($1); $$->operands.set_raw($2); }
+                | CDASH Identifier Expression                                   { NEW($$, Instruction); $$->name.set_raw($2); $$->condition.set_raw($3); $$->operands.set_raw(new ExpressionList()); }
+                | CDASH Identifier Expression ',' ExpressionList                { NEW($$, Instruction); $$->name.set_raw($2); $$->condition.set_raw($3); $$->operands.set_raw($5); }
                 ;
 
 /* Instructions are not statements (because there can be multiple bundled
 instructions per statement) but can be annotated, so they need their own
 annotation rule. */
-AnnotInstr      : AnnotInstr '@' AnnotationData                                 { $$ = $1; $$->annotations.add_raw($3); }
-                | Instruction                                                   { $$ = $1; }
+AnnotInstr      : AnnotInstr '@' AnnotationData                                 { FROM($$, $1); $$->annotations.add_raw($3); }
+                | Instruction                                                   { FROM($$, $1); }
                 ;
 
 /* Single-line bundling syntax. */
-SLParInstrList  : SLParInstrList '|' AnnotInstr                                 { $$ = $1; $$->items.add_raw($3); }
-                | AnnotInstr %prec '|'                                          { $$ = new Bundle(); $$->items.add_raw($1); }
+SLParInstrList  : SLParInstrList '|' AnnotInstr                                 { FROM($$, $1); $$->items.add_raw($3); }
+                | AnnotInstr %prec '|'                                          { NEW($$, Bundle); $$->items.add_raw($1); }
                 ;
 
 /* Multi-line bundling syntax. */
-CBParInstrList  : CBParInstrList Newline SLParInstrList                         { $$ = $1; $$->items.extend($3->items); delete $3; }
-                | SLParInstrList                                                { $$ = $1; }
+CBParInstrList  : CBParInstrList Newline SLParInstrList                         { FROM($$, $1); $$->items.extend($3->items); delete $3; }
+                | SLParInstrList                                                { FROM($$, $1); }
                 ;
 
 /* Map statement, aliasing some expression with an identifier. */
-Mapping         : MAP Expression ',' Identifier                                 { $$ = new Mapping(); $$->expr.set_raw($2); $$->alias.set_raw($4); }
-                | MAP Identifier '=' Expression                                 { $$ = new Mapping(); $$->alias.set_raw($2); $$->expr.set_raw($4); }
+Mapping         : MAP Expression ',' Identifier                                 { NEW($$, Mapping); $$->expr.set_raw($2); $$->alias.set_raw($4); }
+                | MAP Identifier '=' Expression                                 { NEW($$, Mapping); $$->alias.set_raw($2); $$->expr.set_raw($4); }
                 ;
 
 /* Subcircuit header statement. */
-Subcircuit      : '.' Identifier                                                { $$ = new Subcircuit(); $$->name.set_raw($2); }
-                | '.' Identifier '(' Expression ')'                             { $$ = new Subcircuit(); $$->name.set_raw($2); $$->iterations.set_raw($4); }
+Subcircuit      : '.' Identifier                                                { NEW($$, Subcircuit); $$->name.set_raw($2); }
+                | '.' Identifier '(' Expression ')'                             { NEW($$, Subcircuit); $$->name.set_raw($2); $$->iterations.set_raw($4); }
                 ;
 
 /* Any of the supported statements. */
-Statement       : Mapping                                                       { $$ = $1; }
-                | Subcircuit                                                    { $$ = $1; }
-                | SLParInstrList                                                { $$ = $1; }
-                | '{' OptNewline CBParInstrList OptNewline '}'                  { $$ = $3; }
-                | error                                                         { $$ = new ErroneousStatement(); }
+Statement       : Mapping                                                       { FROM($$, $1); }
+                | Subcircuit                                                    { FROM($$, $1); }
+                | SLParInstrList                                                { FROM($$, $1); }
+                | '{' OptNewline CBParInstrList OptNewline '}'                  { FROM($$, $3); }
+                | error                                                         { NEW($$, ErroneousStatement); }
                 ;
 
 /* Statement with annotations attached to it. */
-AnnotStatement  : AnnotStatement '@' AnnotationData                             { $$ = $1; $$->annotations.add_raw($3); }
-                | Statement                                                     { $$ = $1; }
+AnnotStatement  : AnnotStatement '@' AnnotationData                             { FROM($$, $1); $$->annotations.add_raw($3); }
+                | Statement                                                     { FROM($$, $1); }
                 ;
 
 /* List of one or more statements. */
-StatementList   : StatementList Newline AnnotStatement                          { $$ = $1; $$->items.add_raw($3); }
-                | AnnotStatement                                                { $$ = new StatementList(); $$->items.add_raw($1); }
+StatementList   : StatementList Newline AnnotStatement                          { FROM($$, $1); $$->items.add_raw($3); }
+                | AnnotStatement                                                { NEW($$, StatementList); $$->items.add_raw($1); }
                 ;
 
 /* Version. */
-Version         : Version '.' IntegerLiteral                                    { $$ = $1; $$->items.push_back($3->value); delete $3; }
-                | IntegerLiteral                                                { $$ = new Version(); $$->items.push_back($1->value); delete $1; }
+Version         : Version '.' IntegerLiteral                                    { FROM($$, $1); $$->items.push_back($3->value); delete $3; }
+                | IntegerLiteral                                                { NEW($$, Version); $$->items.push_back($1->value); delete $1; }
                 ;
 
 /* Program. */
 Program         : OptNewline VERSION Version Newline
                     QUBITS Expression Newline
-                    StatementList OptNewline                                    { $$ = new Program(); $$->version.set_raw($3); $$->num_qubits.set_raw($6); $$->statements.set_raw($8); }
+                    StatementList OptNewline                                    { NEW($$, Program); $$->version.set_raw($3); $$->num_qubits.set_raw($6); $$->statements.set_raw($8); }
                 | OptNewline VERSION Version Newline
-                    QUBITS Expression OptNewline                                { $$ = new Program(); $$->version.set_raw($3); $$->num_qubits.set_raw($6); }
+                    QUBITS Expression OptNewline                                { NEW($$, Program); $$->version.set_raw($3); $$->num_qubits.set_raw($6); }
                 ;
 
 /* Toplevel. */

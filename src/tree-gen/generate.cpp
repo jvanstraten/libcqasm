@@ -1,12 +1,12 @@
 #include <ios>
 #include <fstream>
 #include <iostream>
-#include "ast-gen.hpp"
+#include "generate.hpp"
 
 /**
  * Formats a docstring.
  */
-void format_doc(
+static void format_doc(
     std::ofstream &stream,
     const std::string &doc,
     const std::string &indent = ""
@@ -50,7 +50,7 @@ void format_doc(
 /**
  * Generates the class for the given node.
  */
-void generate_node_class(
+static void generate_node_class(
     std::ofstream &header,
     std::ofstream &source,
     NodeType &node
@@ -151,7 +151,7 @@ void generate_node_class(
 }
 
 // Generate the visitor base class.
-void generate_visitor_base_class(
+static void generate_visitor_base_class(
     std::ofstream &header,
     std::ofstream &source,
     Nodes &nodes
@@ -204,7 +204,7 @@ void generate_visitor_base_class(
 }
 
 // Generate the recursive visitor class.
-void generate_recursive_visitor_class(
+static void generate_recursive_visitor_class(
     std::ofstream &header,
     std::ofstream &source,
     Nodes &nodes
@@ -251,7 +251,7 @@ void generate_recursive_visitor_class(
 }
 
 // Generate the dumper class.
-void generate_dumper_class(
+static void generate_dumper_class(
     std::ofstream &header,
     std::ofstream &source,
     Nodes &nodes
@@ -304,10 +304,12 @@ void generate_dumper_class(
         source << "    if (!node.is_complete()) {" << std::endl;
         source << "        out << \"!\";" << std::endl;
         source << "    }" << std::endl;
-        if (children.empty()) {
-            source << "    out << \"" << node->title_case_name << "(\";" << std::endl;
-        } else {
-            source << "    out << \"" << node->title_case_name << "(\" << std::endl;" << std::endl;
+        source << "    out << \"" << node->title_case_name << "(\";" << std::endl;
+        source << "    if (node.has_annotation<SourceLocation>()) {" << std::endl;
+        source << "        out << \" # \" << *node.get_annotation<SourceLocation>();" << std::endl;
+        source << "    }" << std::endl;
+        source << "    out << std::endl;" << std::endl;
+        if (!children.empty()) {
             source << "    indent++;" << std::endl;
             for (auto &child : children) {
                 source << "    write_indent();" << std::endl;
@@ -385,48 +387,59 @@ void generate_dumper_class(
 }
 
 /**
- * Main function for generating the AST node header file.
+ * Main function for generating the the header and source file for a tree.
  */
-int main(int argc, char *argv[]) {
+int generate(
+    int argc,
+    char *argv[],
+    const std::string &name,
+    Nodes &nodes
+) {
 
     // Check command line and open files.
     if (argc != 3) {
-        std::cerr << "Usage: ast-gen <header.hpp> <source.cpp>" << std::endl;
+        std::cerr << "Usage: ast-gen <header_dir> <source_dir>" << std::endl;
         return 1;
     }
-    auto header = std::ofstream(argv[1]);
+    auto header = std::ofstream(std::string(argv[1]) + "/cqasm-" + name + "-gen.hpp");
     if (!header.is_open()) {
         std::cerr << "Failed to open header file for writing" << std::endl;
         return 1;
     }
-    auto source = std::ofstream(argv[2]);
+    auto source = std::ofstream(std::string(argv[2]) + "/cqasm-" + name + "-gen.cpp");
     if (!source.is_open()) {
         std::cerr << "Failed to open source file for writing" << std::endl;
         return 1;
     }
 
-    // Build the AST node type objects.
-    auto nodes = build_nodes();
+    // Uppercase the name.
+    std::string upper_name = name;
+    std::transform(
+        upper_name.begin(), upper_name.end(), upper_name.begin(),
+        [](unsigned char c){
+            return std::toupper(c);
+        }
+    );
 
     // Header for the header file.
-    header << "#ifndef _CQASM_AST_GEN_HPP_INCLUDED_" << std::endl;
-    header << "#define _CQASM_AST_GEN_HPP_INCLUDED_" << std::endl;
+    header << "#ifndef _CQASM_" << upper_name << "_GEN_HPP_INCLUDED_" << std::endl;
+    header << "#define _CQASM_" << upper_name << "_GEN_HPP_INCLUDED_" << std::endl;
     header << std::endl;
-    header << "#include \"cqasm-ast-util.hpp\"" << std::endl;
+    header << "#include \"cqasm-" << name << "-head.hpp\"" << std::endl;
     header << std::endl;
     header << "namespace cqasm {" << std::endl;
-    header << "namespace ast {" << std::endl;
+    header << "namespace " << name << " {" << std::endl;
     header << std::endl;
 
     // Header for the source file.
-    source << "#include \"cqasm-ast-gen.hpp\"" << std::endl;
+    source << "#include \"cqasm-" << name << "-gen.hpp\"" << std::endl;
     source << std::endl;
     source << "namespace cqasm {" << std::endl;
-    source << "namespace ast {" << std::endl;
+    source << "namespace " << name << " {" << std::endl;
     source << std::endl;
 
     // Generate forward references for all the classes.
-    header << "// Forward declarations for AST nodes." << std::endl;
+    header << "// Forward declarations for " << name << " nodes." << std::endl;
     for (auto &node : nodes) {
         header << "class " << node->title_case_name << ";" << std::endl;
     }
@@ -443,13 +456,13 @@ int main(int argc, char *argv[]) {
     generate_dumper_class(header, source, nodes);
 
     // Footer for the header file.
-    header << "} // namespace ast" << std::endl;
+    header << "} // namespace " << name << std::endl;
     header << "} // namespace cqasm" << std::endl;
     header << std::endl;
     header << "#endif" << std::endl;
 
     // Footer for the source file.
-    source << "} // namespace ast" << std::endl;
+    source << "} // namespace " << name << std::endl;
     source << "} // namespace cqasm" << std::endl;
 
     return 0;

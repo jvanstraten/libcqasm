@@ -57,7 +57,6 @@
 \\(\n|\r\n?)                                        LOCATION_LINE; DELETE;
 
     /* Gobble up comments */
-    /* TODO: error on EOF within comment mode */
 #.*                                                 DELETE;
 "/*"                                                BEGIN(MODE_MULTILINE_COMMENT); DELETE;
 }
@@ -65,6 +64,7 @@
 "*/"                                                BEGIN(INITIAL); DELETE;
 (\n|\r\n?)                                          LOCATION_LINE; DELETE;
 .                                                   DELETE;
+<<EOF>>                                             WITHOUT_STR(UNEXPECTED_EOF);
 }
 <INITIAL>{
 
@@ -129,6 +129,7 @@
 [\\](\n|\r\n?)                                      LOCATION_LINE; DELETE;
 (\n|\r\n?)                                          LOCATION_LINE; WITH_STR(STRBUILD_APPEND);
 .                                                   WITH_STR(STRBUILD_APPEND);
+<<EOF>>                                             WITHOUT_STR(UNEXPECTED_EOF);
 }
 <INITIAL>{
 
@@ -144,12 +145,14 @@
 ["]                                                 BEGIN(MODE_JSON_STRING); WITH_STR(STRBUILD_APPEND);
 (\n|\r\n?)                                          LOCATION_LINE; WITH_STR(STRBUILD_APPEND);
 .                                                   WITH_STR(STRBUILD_APPEND);
+<<EOF>>                                             WITHOUT_STR(UNEXPECTED_EOF);
 }
 <MODE_JSON_STRING>{
 ["]                                                 BEGIN(MODE_JSON); WITH_STR(STRBUILD_APPEND);
 [\\].                                               WITH_STR(STRBUILD_APPEND);
 (\n|\r\n?)                                          LOCATION_LINE; WITH_STR(STRBUILD_APPEND);
 .                                                   WITH_STR(STRBUILD_APPEND);
+<<EOF>>                                             WITHOUT_STR(UNEXPECTED_EOF);
 }
 <INITIAL>{
 

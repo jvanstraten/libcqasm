@@ -53,17 +53,17 @@ add_flex_bison_dependency(
     cqasm-parser
 )
 
-# Generate the AST nodes.
+# Generate the AST node class definitions.
 add_executable(
     ast-gen
     EXCLUDE_FROM_ALL
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ast-gen/ast.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ast-gen/ast-gen.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/tree-gen/ast.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/tree-gen/generate.cpp"
 )
 
 target_include_directories(
     ast-gen
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/ast-gen"
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/tree-gen"
 )
 
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include")
@@ -74,8 +74,8 @@ add_custom_command(
         "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
     COMMAND
         ast-gen
-        "${CMAKE_CURRENT_BINARY_DIR}/include/cqasm-ast-gen.hpp"
-        "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
+        "${CMAKE_CURRENT_BINARY_DIR}/include"
+        "${CMAKE_CURRENT_BINARY_DIR}"
 )
 
 # Main cQASM library.

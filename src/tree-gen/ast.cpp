@@ -1,9 +1,9 @@
-#include "ast-gen.hpp"
+#include "generate.hpp"
 
 /**
  * Constructs the cQASM AST nodes.
  */
-std::vector<std::shared_ptr<NodeType>> build_nodes() {
+static std::vector<std::shared_ptr<NodeType>> build_nodes() {
 
     // The set of all nodes is gathered in this vector.
     auto nodes = std::vector<std::shared_ptr<NodeType>>();
@@ -389,4 +389,12 @@ std::vector<std::shared_ptr<NodeType>> build_nodes() {
         .build(nodes);
 
     return nodes;
+}
+
+/**
+ * Main function.
+ */
+int main(int argc, char *argv[]) {
+    auto nodes = build_nodes();
+    return generate(argc, argv, "ast", nodes);
 }

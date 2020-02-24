@@ -1,5 +1,5 @@
-#ifndef _AST_GEN_HPP_INCLUDED_
-#define _AST_GEN_HPP_INCLUDED_
+#ifndef _GENERATE_HPP_INCLUDED_
+#define _GENERATE_HPP_INCLUDED_
 
 #include <string>
 #include <sstream>
@@ -239,8 +239,13 @@ public:
 };
 
 /**
- * Constructs the cQASM AST nodes.
+ * Main function for generating the the header and source file for a tree.
  */
-Nodes build_nodes();
+int generate(
+    int argc,
+    char *argv[],
+    const std::string &name,
+    Nodes &nodes
+);
 
 #endif
