@@ -433,6 +433,9 @@ int generate(
 
     // Header for the source file.
     source << "#include \"cqasm-" << name << "-gen.hpp\"" << std::endl;
+    source << "#include \"cqasm-analyzer.hpp\"" << std::endl;
+    source << std::endl;
+    source << "using namespace cqasm;" << std::endl;
     source << std::endl;
     source << "namespace cqasm {" << std::endl;
     source << "namespace " << name << " {" << std::endl;

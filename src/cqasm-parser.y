@@ -17,12 +17,12 @@
 }
 
 %code top {
-    #define ADD_SOURCE_LOCATION(v)          \
-        v->set_annotation(SourceLocation(   \
-            analyzer.result.filename,       \
-            yyloc.first_line,               \
-            yyloc.first_column,             \
-            yyloc.last_line,                \
+    #define ADD_SOURCE_LOCATION(v)                  \
+        v->set_annotation(cqasm::SourceLocation(    \
+            analyzer.result.filename,               \
+            yyloc.first_line,                       \
+            yyloc.first_column,                     \
+            yyloc.last_line,                        \
             yyloc.last_column))
 
 
@@ -30,16 +30,16 @@
         v = new T();            \
         ADD_SOURCE_LOCATION(v)
 
-    #define FROM(t, s)                                                          \
-        t = s;                                                                  \
-        {                                                                       \
-            SourceLocation *loc = t->get_annotation<SourceLocation>();          \
-            if (!loc) {                                                         \
-                ADD_SOURCE_LOCATION(t);                                         \
-            } else {                                                            \
-                loc->expand_to_include(yyloc.first_line, yyloc.first_column);   \
-                loc->expand_to_include(yyloc.last_line, yyloc.last_column);     \
-            }                                                                   \
+    #define FROM(t, s)                                                                  \
+        t = s;                                                                          \
+        {                                                                               \
+            cqasm::SourceLocation *loc = t->get_annotation<cqasm::SourceLocation>();    \
+            if (!loc) {                                                                 \
+                ADD_SOURCE_LOCATION(t);                                                 \
+            } else {                                                                    \
+                loc->expand_to_include(yyloc.first_line, yyloc.first_column);           \
+                loc->expand_to_include(yyloc.last_line, yyloc.last_column);             \
+            }                                                                           \
         }
 
 }
