@@ -107,10 +107,10 @@ static void generate_node_class(
     // Print is_complete function.
     auto doc = "Returns whether this `" + node.title_case_name + "` is complete/fully defined.";
     format_doc(header, doc, "    ");
-    header << "    bool is_complete() override;" << std::endl << std::endl;
+    header << "    bool is_complete() const override;" << std::endl << std::endl;
     format_doc(source, doc);
     source << "bool " << node.title_case_name;
-    source << "::is_complete() {" << std::endl;
+    source << "::is_complete() const {" << std::endl;
     if (node.is_error_marker) {
         source << "    return false;" << std::endl;
     } else {
@@ -344,7 +344,7 @@ static void generate_dumper_class(
                         source << "    } else {" << std::endl;
                         source << "        out << \"[\" << std::endl;" << std::endl;
                         source << "        indent++;" << std::endl;
-                        source << "        for (auto &sptr : node." << child.name << ".vec) {" << std::endl;
+                        source << "        for (auto &sptr : node." << child.name << ") {" << std::endl;
                         source << "            if (sptr) {" << std::endl;
                         source << "                sptr->visit(*this);" << std::endl;
                         source << "            } else {" << std::endl;

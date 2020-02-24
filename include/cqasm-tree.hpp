@@ -171,7 +171,7 @@ public:
     /**
      * Returns whether this object is complete/fully defined.
      */
-    virtual bool is_complete() {
+    virtual bool is_complete() const {
         return true;
     }
 
@@ -245,25 +245,163 @@ public:
  */
 template <class T>
 class Maybe : public Node {
-public:
+protected:
 
     /**
      * The contained value. Must be non-null for a completed AST.
      */
     std::shared_ptr<T> val;
 
+public:
+
+    /**
+     * Sets the value to a copy of the object pointed to, or clears it if null.
+     */
+    void set(const T *ob) {
+        if (ob) {
+            val = std::make_shared(*ob);
+        } else {
+            val.reset();
+        }
+    }
+
+    /**
+     * Sets the value to a copy of the object pointed to.
+     */
+    Maybe &operator=(const T *ob) {
+        set(*ob);
+    }
+
+    /**
+     * Sets the value to a copy of the given object.
+     */
+    void set(const T &ob) {
+        val = std::make_shared(ob);
+    }
+
+    /**
+     * Sets the value to a copy of the given object.
+     */
+    Maybe &operator=(const T &ob) {
+        set(ob);
+    }
+
+    /**
+     * Move the given object into the contained value.
+     */
+    void set(T &&ob) {
+        val = std::make_shared(std::move(ob));
+    }
+
+    /**
+     * Sets the value to a copy of the given object.
+     */
+    Maybe &operator=(T &&ob) {
+        set(std::move(ob));
+    }
+
+    /**
+     * Set the given object by means of a `shared_ptr`.
+     */
+    void set(std::shared_ptr<T> &ob) {
+        val = ob;
+    }
+
+    /**
+     * Sets the value to a copy of the given object.
+     */
+    Maybe &operator=(std::shared_ptr<T> &ob) {
+        set(ob);
+    }
+
     /**
      * Sets the value to the given new-initialized class. Takes ownership of
      * the pointer.
+     *
+     * @warning Do NOT give a pointer to a statically allocated,
+     * stack-allocated, or `malloc`-allocated object to this function, because
+     * then the destructor will be wrong. You will then get weird runtime errors
+     * when the object is destroyed. Use `set()` or `operator=` instead.
      */
     void set_raw(T *ptr) {
         val = std::shared_ptr<T>(ptr);
     }
 
     /**
+     * Removes the contained value.
+     */
+    void reset() {
+        val.reset();
+    }
+
+    /**
+     * Returns whether this Maybe is empty.
+     */
+    virtual bool empty() const {
+        return !val;
+    }
+
+    /**
+     * Returns whether this Maybe is empty.
+     */
+    size_t size() const {
+        return val ? 1 : 0;
+    }
+
+    /**
+     * Returns a mutable reference to the contained value. Raises an
+     * `out_of_range` when the reference is empty.
+     */
+    T &get() {
+        if (!val) {
+            throw std::out_of_range("dereferencing empty Maybe/One object");
+        }
+        return *val;
+    }
+
+    /**
+     * Returns a const reference to the contained value. Raises an
+     * `out_of_range` when the reference is empty.
+     */
+    const T &get() const {
+        if (!val) {
+            throw std::out_of_range("dereferencing empty Maybe/One object");
+        }
+        return *val;
+    }
+
+    /**
+     * Mutable dereference operator, shorthand for `get()`.
+     */
+    T &operator*() {
+        return get();
+    }
+
+    /**
+     * Constant dereference operator, shorthand for `get()`.
+     */
+    const T &operator*() const {
+        return get();
+    }
+
+    /**
+     * Mutable dereference operator, shorthand for `get()`.
+     */
+    T *operator->() {
+        return &get();
+    }
+
+    /**
+     * Constant dereference operator, shorthand for `get()`.
+     */
+    const T *operator->() const {
+        return &get();
+    }
+
+    /**
      * Returns whether this object is complete/fully defined.
      */
-    bool is_complete() override {
+    bool is_complete() const override {
         return !val || val->is_complete();
     }
 
@@ -275,13 +413,6 @@ public:
         if (val) {
             val->visit(visitor);
         }
-    }
-
-    /**
-     * Returns whether this Maybe is empty.
-     */
-    virtual bool empty() {
-        return !val;
     }
 
 };
@@ -296,7 +427,7 @@ public:
     /**
      * Returns whether this object is complete/fully defined.
      */
-    bool is_complete() override {
+    bool is_complete() const override {
         return this->val && this->val->is_complete();
     }
 
@@ -307,15 +438,73 @@ public:
  */
 template <class T>
 class Any : public Node {
-public:
+protected:
 
     /**
-     * The contained vector. The `shared_ptr`s may be assumed to be non-null.
+     * The contained vector. The `shared_ptr`s are assumed to be non-null.
      */
     std::vector<std::shared_ptr<T>> vec;
 
+public:
+
+    /**
+     * Adds the value pointed to by copy. No-operation when ob is null.
+     */
+    void add(const T *ob, ssize_t pos=-1) {
+        if (!ob) {
+            return;
+        }
+        if (pos < 0 || pos >= size()) {
+            this->vec.emplace_back(std::make_shared(*ob));
+        } else {
+            this->vec.emplace(this->vec.cbegin() + pos, std::make_shared(*ob));
+        }
+    }
+
+    /**
+     * Adds the given value by copy.
+     */
+    void add(const T &ob, ssize_t pos=-1) {
+        if (pos < 0 || pos >= size()) {
+            this->vec.emplace_back(std::make_shared(ob));
+        } else {
+            this->vec.emplace(this->vec.cbegin() + pos, std::make_shared(ob));
+        }
+    }
+
+    /**
+     * Adds the given value by move.
+     */
+    void add(T &&ob, ssize_t pos=-1) {
+        if (pos < 0 || pos >= size()) {
+            this->vec.emplace_back(std::make_shared(std::move(ob)));
+        } else {
+            this->vec.emplace(this->vec.cbegin() + pos, std::make_shared(std::move(ob)));
+        }
+    }
+
+    /**
+     * Set the given object by means of a `shared_ptr`. No operation when op is
+     * null.
+     */
+    void add(std::shared_ptr<T> &ob, ssize_t pos=-1) {
+        if (!ob) {
+            return;
+        }
+        if (pos < 0 || pos >= size()) {
+            this->vec.emplace_back(ob);
+        } else {
+            this->vec.emplace(this->vec.cbegin() + pos, ob);
+        }
+    }
+
     /**
      * Appends the given new-initialized class. Takes ownership of the pointer.
+     *
+     * @warning Do NOT give a pointer to a statically allocated,
+     * stack-allocated, or `malloc`-allocated object to this function, because
+     * then the destructor will be wrong. You will then get weird runtime errors
+     * when the object is destroyed. Use `set()` or `operator=` instead.
      */
     void add_raw(T *ptr) {
         this->vec.emplace_back(ptr);
@@ -329,9 +518,102 @@ public:
     }
 
     /**
+     * Removes the object at the given index, or at the back if no index is
+     * given.
+     */
+    void remove(ssize_t pos=-1) {
+        if (size() == 0) {
+            return;
+        }
+        if (pos < 0 || pos >= size()) {
+            pos = size() - 1;
+        }
+        this->vec.erase(this->vec.cbegin() + pos);
+    }
+
+    /**
+     * Removes the contained values.
+     */
+    void reset() {
+        vec.clear();
+    }
+
+    /**
+     * Returns whether this Any is empty.
+     */
+    virtual bool empty() const {
+        return vec.empty();
+    }
+
+    /**
+     * Returns the number of elements in this Any.
+     */
+    size_t size() const {
+        return vec.size();
+    }
+
+    /**
+     * Returns a mutable reference to the contained value at the given index.
+     * Raises an `out_of_range` when the reference is empty.
+     */
+    T &get(size_t index) {
+        return vec.at(index);
+    }
+
+    /**
+     * Returns a mutable reference to the contained value at the given index.
+     * Raises an `out_of_range` when the reference is empty.
+     */
+    const T &get(size_t index) const {
+        return vec.at(index);
+    }
+
+    /**
+     * Shorthand for `get()`.
+     */
+    T &operator[] (size_t index) {
+        return get(index);
+    }
+
+    /**
+     * Shorthand for `get()`.
+     */
+    const T &operator[] (size_t index) const {
+        return get(index);
+    }
+
+    /**
+     * `begin()` for for-each loops.
+     */
+    typename std::vector<std::shared_ptr<T>>::iterator begin() {
+        return vec.begin();
+    }
+
+    /**
+     * `begin()` for for-each loops.
+     */
+    typename std::vector<std::shared_ptr<T>>::const_iterator begin() const {
+        return vec.begin();
+    }
+
+    /**
+     * `end()` for for-each loops.
+     */
+    typename std::vector<std::shared_ptr<T>>::iterator end() {
+        return vec.end();
+    }
+
+    /**
+     * `end()` for for-each loops.
+     */
+    typename std::vector<std::shared_ptr<T>>::const_iterator end() const {
+        return vec.end();
+    }
+
+    /**
      * Returns whether this object is complete/fully defined.
      */
-    bool is_complete() override {
+    bool is_complete() const override {
         for (auto &sptr : this->vec) {
             if (!sptr->is_complete()) {
                 return false;
@@ -352,13 +634,6 @@ public:
         }
     }
 
-    /**
-     * Returns whether this Any is empty.
-     */
-    virtual bool empty() {
-        return vec.empty();
-    }
-
 };
 
 /**
@@ -371,7 +646,7 @@ public:
     /**
      * Returns whether this object is complete/fully defined.
      */
-    bool is_complete() override {
+    bool is_complete() const override {
         return !this->vec.empty() && Any<T>::is_complete();
     }
 
