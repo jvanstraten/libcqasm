@@ -111,12 +111,24 @@ std::vector<std::shared_ptr<NodeType>> build_nodes() {
         .build(nodes);
 
     //-------------------------------------------------------------------------
+    // Function calls
+    //-------------------------------------------------------------------------
+    auto function_call =
+        NodeBuilder(
+            "function_call",
+            "A function call.")
+        .derive_from(expression)
+        .with(One, identifier, "name", "The name of the function.")
+        .with(One, expression_list, "arguments", "The function arguments.")
+        .build(nodes);
+
+    //-------------------------------------------------------------------------
     // Indexation operator
     //-------------------------------------------------------------------------
     auto index_entry =
         NodeBuilder(
             "index_entry",
-            "An enty in an index list. Can be a single index or a range.")
+            "An entry in an index list. Can be a single index or a range.")
         .build(nodes);
 
     auto index_item =
@@ -182,10 +194,24 @@ std::vector<std::shared_ptr<NodeType>> build_nodes() {
         .with(One, expression, "rhs", "The right-hand side of the expression.")
         .build(nodes);
 
+    auto power =
+        NodeBuilder(
+            "power",
+            "Power operator.")
+        .derive_from(binary_op)
+        .build(nodes);
+
     auto multiply =
         NodeBuilder(
             "multiply",
             "Multiplication operator.")
+        .derive_from(binary_op)
+        .build(nodes);
+
+    auto divide =
+        NodeBuilder(
+            "divide",
+            "Division operator.")
         .derive_from(binary_op)
         .build(nodes);
 

@@ -43,6 +43,8 @@ bison_target(
     cqasm-parser
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-parser.y"
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-parser.cpp"
+    COMPILE_FLAGS
+        "-rall --report-file=${CMAKE_CURRENT_BINARY_DIR}/cqasm-parser.txt -Werror=conflicts-sr -Werror=conflicts-rr"
 )
 
 # Dependency between lexer and parser.

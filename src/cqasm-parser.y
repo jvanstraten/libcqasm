@@ -23,7 +23,14 @@
     char           	*str;
     IntegerLiteral  *ilit;
     FloatLiteral    *flit;
+    MatrixLiteral1  *mat1;
+    MatrixLiteral2  *mat2;
+    MatrixLiteral   *mat;
+    StringBuilder   *strb;
+    StringLiteral   *slit;
+    JsonLiteral     *jlit;
     Identifier      *idnt;
+    FunctionCall    *func;
     Index           *indx;
     UnaryOp         *unop;
     BinaryOp        *biop;
@@ -33,12 +40,6 @@
     IndexRange      *idxr;
     IndexEntry      *idxe;
     IndexList       *idxl;
-    MatrixLiteral1  *mat1;
-    MatrixLiteral2  *mat2;
-    MatrixLiteral   *mat;
-    StringBuilder   *strb;
-    StringLiteral   *slit;
-    JsonLiteral     *jlit;
     AnnotationData  *adat;
     Instruction     *inst;
     Bundle          *bun;
@@ -53,7 +54,14 @@
 /* Typenames for nonterminals */
 %type <ilit> IntegerLiteral
 %type <flit> FloatLiteral
+%type <mat1> MatrixLiteral1
+%type <mat2> MatrixLiteral2 MatrixLiteral2c
+%type <mat>  MatrixLiteral
+%type <strb> StringBuilder
+%type <slit> StringLiteral
+%type <jlit> JsonLiteral
 %type <idnt> Identifier
+%type <func> FunctionCall
 %type <indx> Index
 %type <unop> UnaryOp
 %type <biop> BinaryOp
@@ -63,12 +71,6 @@
 %type <idxr> IndexRange
 %type <idxe> IndexEntry
 %type <idxl> IndexList
-%type <mat1> MatrixLiteral1
-%type <mat2> MatrixLiteral2 MatrixLiteral2c
-%type <mat>  MatrixLiteral
-%type <strb> StringBuilder
-%type <slit> StringLiteral
-%type <jlit> JsonLiteral
 %type <adat> AnnotationName AnnotationData
 %type <inst> Instruction AnnotInstr
 %type <bun>  SLParInstrList CBParInstrList
@@ -106,6 +108,9 @@
 /* Identifiers */
 %token <str> IDENTIFIER
 
+/* Multi-character operators */
+%token POWER
+
 /* Illegal character */
 %token BAD_CHARACTER
 
@@ -115,7 +120,9 @@ operators.[ch]pp for correct pretty-printing! */
 %left ',' ':'                                /* SIMD/SGMQ indexation */
 %left '+' '-'                                /* Addition/subtraction */
 %left '*' '/'                                /* Multiplication/division */
-%right UPLUS UMINUS                          /* Unaries */
+%left POWER                                  /* Power */
+%right UMINUS                                /* Negation */
+%left '(' '['                                /* Function call, indexation */
 
 /* In a single-line parallel statement, possibly containing only a single gate,
 annotations apply to the gate, not the bundle. Therefore '@' has greater
@@ -146,10 +153,6 @@ IntegerLiteral  : INT_LITERAL                                                   
 
 /* Floating point literals. */
 FloatLiteral    : FLOAT_LITERAL                                                 { $$ = new FloatLiteral(); $$->value = std::strtod($1, nullptr); std::free($1); }
-                ;
-
-/* Identifiers. */
-Identifier      : IDENTIFIER                                                    { $$ = new Identifier(); $$->name = std::string($1); std::free($1); }
                 ;
 
 /* Old matrix syntax, specified as a row-major flattened list of the
@@ -186,6 +189,14 @@ StringLiteral   : STRING_OPEN StringBuilder STRING_CLOSE                        
 JsonLiteral     : JSON_OPEN StringBuilder JSON_CLOSE                            { $$ = new JsonLiteral(); $$->value = $2->stream.str(); delete $2; }
                 ;
 
+/* Identifiers. */
+Identifier      : IDENTIFIER                                                    { $$ = new Identifier(); $$->name = std::string($1); std::free($1); }
+                ;
+
+/* Function calls. */
+FunctionCall    : Identifier '(' ExpressionList ')' %prec '('                   { $$ = new FunctionCall(); $$->name.set_raw($1); $$->arguments.set_raw($3); }
+                ;
+
 /* Array/register indexation. */
 Index           : Expression '[' IndexList ']'                                  { $$ = new Index(); $$->expr.set_raw($1); $$->indices.set_raw($3); }
                 ;
@@ -194,7 +205,9 @@ Index           : Expression '[' IndexList ']'                                  
 UnaryOp         : '-' Expression %prec UMINUS                                   { $$ = new Negate(); $$->expr.set_raw($2); }
                 ;
 
-BinaryOp        : Expression '*' Expression                                     { $$ = new Multiply(); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+BinaryOp        : Expression POWER Expression                                   { $$ = new Power();    $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+                | Expression '*' Expression                                     { $$ = new Multiply(); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
+                | Expression '/' Expression                                     { $$ = new Divide();   $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
                 | Expression '+' Expression                                     { $$ = new Add();      $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
                 | Expression '-' Expression                                     { $$ = new Subtract(); $$->lhs.set_raw($1); $$->rhs.set_raw($3); }
                 ;
@@ -202,15 +215,15 @@ BinaryOp        : Expression '*' Expression                                     
 /* Supported types of expressions. */
 Expression      : IntegerLiteral                                                { $$ = $1; }
                 | FloatLiteral                                                  { $$ = $1; }
-                | Identifier                                                    { $$ = $1; }
                 | MatrixLiteral                                                 { $$ = $1; }
                 | StringLiteral                                                 { $$ = $1; }
                 | JsonLiteral                                                   { $$ = $1; }
+                | Identifier                                                    { $$ = $1; }
+                | FunctionCall                                                  { $$ = $1; }
                 | Index                                                         { $$ = $1; }
-                | '(' Expression ')'                                            { $$ = $2; }
-                | '+' Expression %prec UPLUS                                    { $$ = $2; }
                 | UnaryOp                                                       { $$ = $1; }
                 | BinaryOp                                                      { $$ = $1; }
+                | '(' Expression ')'                                            { $$ = $2; }
                 | error                                                         { $$ = new ErroneousExpression(); }
                 ;
 
