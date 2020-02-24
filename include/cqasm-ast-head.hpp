@@ -14,6 +14,9 @@ namespace ast {
 // Base classes used to construct the AST.
 USING_CQASM_TREE;
 
+// Forward declaration for the NodeType enum.
+enum class NodeType;
+
 // Forward declaration for the Visitor class defined in cqasm-ast-gen.hpp.
 class Visitor;
 
@@ -39,6 +42,23 @@ class Node : public Base {
 public:
 
     /**
+     * Returns the `NodeType` of this node.
+     */
+    virtual NodeType type() const = 0;
+
+    /**
+     * Equality operator. Ignores annotations!
+     */
+    virtual bool operator==(const Node& rhs) const = 0;
+
+    /**
+     * Inequality operator. Ignores annotations!
+     */
+    inline bool operator!=(const Node& rhs) const {
+        return !(*this == rhs);
+    }
+
+    /**
      * Visit this object.
      */
     virtual void visit(Visitor &visitor) = 0;
@@ -55,7 +75,7 @@ public:
  * and escape sequences while parsing. This is abstracted out of the AST; it
  * should never appear after parsing completes.
  */
-class StringBuilder : public Node {
+class StringBuilder : public Base {
 public:
     std::ostringstream stream;
 
@@ -68,11 +88,6 @@ public:
      * Pushes an escape sequence into the string.
      */
     void push_escape(const std::string &escape);
-
-    /**
-     * Visit this object.
-     */
-    void visit(Visitor &visitor) override;
 
 };
 

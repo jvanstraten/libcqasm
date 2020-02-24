@@ -105,33 +105,67 @@ static void generate_node_class(
     }
 
     // Print is_complete function.
-    auto doc = "Returns whether this `" + node.title_case_name + "` is complete/fully defined.";
-    format_doc(header, doc, "    ");
-    header << "    bool is_complete() const override;" << std::endl << std::endl;
-    format_doc(source, doc);
-    source << "bool " << node.title_case_name;
-    source << "::is_complete() const {" << std::endl;
-    if (node.is_error_marker) {
-        source << "    return false;" << std::endl;
-    } else {
-        for (auto &child : node.children) {
-            switch (child.type) {
-                case Maybe:
-                case One:
-                case Any:
-                case Many:
-                    source << "    if (!" << child.name << ".is_complete()) return false;" << std::endl;
-                    break;
-                case Version:
-                    source << "    if (" << child.name << ".empty()) return false;" << std::endl;
-                    break;
-                default:
-                    break;
+    if (node.derived.empty()) {
+        auto doc = "Returns whether this `" + node.title_case_name + "` is complete/fully defined.";
+        format_doc(header, doc, "    ");
+        header << "    bool is_complete() const override;" << std::endl << std::endl;
+        format_doc(source, doc);
+        source << "bool " << node.title_case_name;
+        source << "::is_complete() const {" << std::endl;
+        if (node.is_error_marker) {
+            source << "    return false;" << std::endl;
+        } else {
+            for (auto &child : node.all_children()) {
+                switch (child.type) {
+                    case Maybe:
+                    case One:
+                    case Any:
+                    case Many:
+                        source << "    if (!" << child.name << ".is_complete()) return false;" << std::endl;
+                        break;
+                    case Version:
+                        source << "    if (" << child.name << ".empty()) return false;" << std::endl;
+                        break;
+                    default:
+                        break;
+                }
+            }
+            source << "    return true;" << std::endl;
+        }
+        source << "}" << std::endl << std::endl;
+    }
+
+    // Print type() function.
+    if (node.derived.empty()) {
+        auto doc = "Returns the `NodeType` of this node.";
+        format_doc(header, doc, "    ");
+        header << "    NodeType type() const override;" << std::endl << std::endl;
+        format_doc(source, doc);
+        source << "NodeType " << node.title_case_name;
+        source << "::type() const {" << std::endl;
+        source << "    return NodeType::" << node.title_case_name << ";" << std::endl;
+        source << "}" << std::endl << std::endl;
+    }
+
+    // Print equality operator.
+    if (node.derived.empty()) {
+        auto doc = "Equality operator. Ignores annotations!";
+        format_doc(header, doc, "    ");
+        header << "    bool operator==(const Node& rhs) const override;" << std::endl << std::endl;
+        format_doc(source, doc);
+        source << "bool " << node.title_case_name;
+        source << "::operator==(const Node& rhs) const {" << std::endl;
+        source << "    if (rhs.type() != NodeType::" << node.title_case_name << ") return false;" << std::endl;
+        auto children = node.all_children();
+        if (!children.empty()) {
+            source << "    auto rhsc = static_cast<const " << node.title_case_name << "&>(rhs);" << std::endl;
+            for (auto &child : children) {
+                source << "    if (this->" << child.name << " != rhsc." << child.name << ") return false;" << std::endl;
             }
         }
         source << "    return true;" << std::endl;
+        source << "}" << std::endl << std::endl;
     }
-    source << "}" << std::endl << std::endl;
 
     // Print visitor function.
     if (node.derived.empty()) {
@@ -440,6 +474,24 @@ int generate(
     source << "namespace cqasm {" << std::endl;
     source << "namespace " << name << " {" << std::endl;
     source << std::endl;
+
+    // Generate the NodeType enum.
+    std::vector<std::string> variants;
+    for (auto &node : nodes) {
+        if (node->derived.empty()) {
+            variants.push_back(node->title_case_name);
+        }
+    }
+    format_doc(header, "Enumeration of all ast node types.");
+    header << "enum class NodeType {" << std::endl;
+    for (size_t i = 0; i < variants.size(); i++) {
+        header << "    " << variants[i];
+        if (i < variants.size() - 1) {
+            header << ",";
+        }
+        header << std::endl;
+    }
+    header << "};" << std::endl << std::endl;
 
     // Generate forward references for all the classes.
     header << "// Forward declarations for " << name << " nodes." << std::endl;

@@ -40,13 +40,6 @@ void StringBuilder::push_escape(const std::string &escape) {
     }
 }
 
-/**
- * Visit this object.
- */
-void StringBuilder::visit(Visitor &visitor) {
-    throw std::runtime_error("Cannot visit StringBuilders");
-}
-
 } // namespace ast
 } // namespace cqasm
 

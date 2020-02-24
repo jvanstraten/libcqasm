@@ -6,7 +6,7 @@
  * specialized/generalized types, for example for the relation between an
  * expression and a binary operator; a binary operator is a speciailization of
  * an expression, so it derives from the expression node class. All node types
- * should ultimately inherit from `Node`.
+ * should ultimately inherit from `Base`.
  *
  * The children of the nodes are represented as class members. Instead of
  * containing the child node directly, which would cause problems with
@@ -187,7 +187,7 @@ public:
 /**
  * Base class for all tree nodes.
  */
-class Node {
+class Base {
 private:
 
     /**
@@ -201,7 +201,7 @@ public:
      * We're using inheritance, so we need a virtual destructor for proper
      * cleanup.
      */
-    virtual ~Node() {
+    virtual ~Base() {
     };
 
     /**
@@ -280,7 +280,7 @@ public:
  * Convenience class for a reference to an optional AST node.
  */
 template <class T>
-class Maybe : public Node {
+class Maybe : public Base {
 protected:
 
     /**
@@ -435,6 +435,20 @@ public:
     }
 
     /**
+     * Equality operator.
+     */
+    bool operator==(const Maybe& rhs) const {
+        return val == rhs.val;
+    }
+
+    /**
+     * Inequality operator.
+     */
+    inline bool operator!=(const Maybe& rhs) const {
+        return !(*this == rhs);
+    }
+
+    /**
      * Returns whether this object is complete/fully defined.
      */
     bool is_complete() const override {
@@ -473,7 +487,7 @@ public:
  * Convenience class for zero or more AST nodes.
  */
 template <class T>
-class Any : public Node {
+class Any : public Base {
 protected:
 
     /**
@@ -647,6 +661,20 @@ public:
     }
 
     /**
+     * Equality operator.
+     */
+    bool operator==(const Any& rhs) const {
+        return vec == rhs.vec;
+    }
+
+    /**
+     * Inequality operator.
+     */
+    inline bool operator!=(const Any& rhs) const {
+        return !(*this == rhs);
+    }
+
+    /**
      * Returns whether this object is complete/fully defined.
      */
     bool is_complete() const override {
@@ -693,7 +721,7 @@ public:
  * in a namespace for a certain kind of tree.
  */
 #define USING_CQASM_TREE                                        \
-    using Base = ::cqasm::tree::Node;                           \
+    using Base = ::cqasm::tree::Base;                           \
     template <class T> using Maybe = ::cqasm::tree::Maybe<T>;   \
     template <class T> using One   = ::cqasm::tree::One<T>;     \
     template <class T> using Any   = ::cqasm::tree::Any<T>;     \
