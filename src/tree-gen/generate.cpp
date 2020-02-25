@@ -48,6 +48,110 @@ static void format_doc(
 }
 
 /**
+ * Generates the node type enumeration.
+ */
+static void generate_enum(
+    std::ofstream &header,
+    Nodes &nodes
+) {
+
+    // Gather the leaf types.
+    std::vector<std::string> variants;
+    for (auto &node : nodes) {
+        if (node->derived.empty()) {
+            variants.push_back(node->title_case_name);
+        }
+    }
+
+    // Print the enum.
+    format_doc(header, "Enumeration of all node types.");
+    header << "enum class NodeType {" << std::endl;
+    for (size_t i = 0; i < variants.size(); i++) {
+        header << "    " << variants[i];
+        if (i < variants.size() - 1) {
+            header << ",";
+        }
+        header << std::endl;
+    }
+    header << "};" << std::endl << std::endl;
+
+}
+
+/**
+ * Generates an `as_<type>` function.
+ */
+static void generate_typecast_function(
+    std::ofstream &header,
+    std::ofstream &source,
+    const std::string &clsname,
+    NodeType &into,
+    bool allowed
+) {
+    std::string doc = "Interprets this node to a node of type "
+                    + into.title_case_name
+                    + ". Returns null if it has the wrong type.";
+    format_doc(header, doc, "    ");
+    header << "    ";
+    if (!allowed) header << "virtual ";
+    header << into.title_case_name << " *";
+    header << "as_" << into.snake_case_name << "()";
+    if (allowed) header << " override";
+    header << ";" << std::endl << std::endl;
+    format_doc(source, doc);
+    source << into.title_case_name << " *";
+    source << clsname << "::as_" << into.snake_case_name << "() {" << std::endl;
+    if (allowed) {
+        source << "    return static_cast<" << into.title_case_name << "*>(this);" << std::endl;
+    } else {
+        source << "    return nullptr;" << std::endl;
+    }
+    source << "}" << std::endl << std::endl;
+}
+
+/**
+ * Generates the base class for the nodes.
+ */
+static void generate_base_class(
+    std::ofstream &header,
+    std::ofstream &source,
+    Nodes &nodes
+) {
+
+    format_doc(header, "Main class for all nodes.");
+    header << "class Node : public Base {" << std::endl;
+    header << "public:" << std::endl << std::endl;
+
+    format_doc(header, "Returns the `NodeType` of this node.", "    ");
+    header << "    virtual NodeType type() const = 0;" << std::endl << std::endl;
+
+    format_doc(header, "Equality operator. Ignores annotations!", "    ");
+    header << "    virtual bool operator==(const Node& rhs) const = 0;" << std::endl << std::endl;
+
+    format_doc(header, "Inequality operator. Ignores annotations!", "    ");
+    header << "    inline bool operator!=(const Node& rhs) const {" << std::endl;
+    header << "        return !(*this == rhs);" << std::endl;
+    header << "    }" << std::endl << std::endl;
+
+    format_doc(header, "Visit this object.", "    ");
+    header << "    virtual void visit(Visitor &visitor) = 0;" << std::endl << std::endl;
+
+    format_doc(header, "Writes a debug dump of this node to the given stream.", "    ");
+    header << "    void dump(std::ostream &out=std::cout);" << std::endl << std::endl;
+    format_doc(source, "Writes a debug dump of this node to the given stream.");
+    source << "void Node::dump(std::ostream &out) {" << std::endl;
+    source << "    auto dumper = Dumper(out);" << std::endl;
+    source << "    visit(dumper);" << std::endl;
+    source << "}" << std::endl << std::endl;
+
+    for (auto &node : nodes) {
+        generate_typecast_function(header, source, "Node", *node, false);
+    }
+
+    header << "};" << std::endl << std::endl;
+
+}
+
+/**
  * Generates the class for the given node.
  */
 static void generate_node_class(
@@ -76,30 +180,18 @@ static void generate_node_class(
         }
         header << "    ";
         switch (child.type) {
-            case Maybe:
-                header << "Maybe<" << child.node_type->title_case_name << "> ";
-                break;
-            case One:
-                header << "One<" << child.node_type->title_case_name << "> ";
-                break;
-            case Any:
-                header << "Any<" << child.node_type->title_case_name << "> ";
-                break;
-            case Many:
-                header << "Many<" << child.node_type->title_case_name << "> ";
-                break;
-            case Str:
-                header << "Str ";
-                break;
-            case Int:
-                header << "Int ";
-                break;
-            case Real:
-                header << "Real ";
-                break;
-            case Version:
-                header << "std::vector<Int> ";
-                break;
+            case Maybe:   header << "::cqasm::tree::Maybe<" << child.node_type->title_case_name << "> "; break;
+            case One:     header << "::cqasm::tree::One<"   << child.node_type->title_case_name << "> "; break;
+            case Any:     header << "::cqasm::tree::Any<"   << child.node_type->title_case_name << "> "; break;
+            case Many:    header << "::cqasm::tree::Many<"  << child.node_type->title_case_name << "> "; break;
+            case Str:     header << "::cqasm::primitives::Str ";     break;
+            case Bool:    header << "::cqasm::primitives::Bool ";    break;
+            case Int:     header << "::cqasm::primitives::Int ";     break;
+            case Real:    header << "::cqasm::primitives::Real ";    break;
+            case RMatrix: header << "::cqasm::primitives::RMatrix "; break;
+            case Complex: header << "::cqasm::primitives::Complex "; break;
+            case CMatrix: header << "::cqasm::primitives::CMatrix "; break;
+            case Version: header << "::cqasm::primitives::Version "; break;
         }
         header << child.name << ";" << std::endl << std::endl;
     }
@@ -180,6 +272,9 @@ static void generate_node_class(
         source << "}" << std::endl << std::endl;
     }
 
+    // Print conversion function.
+    generate_typecast_function(header, source, node.title_case_name, node, true);
+
     // Print class footer.
     header << "};" << std::endl << std::endl;
 }
@@ -194,8 +289,8 @@ static void generate_visitor_base_class(
     // Print class header.
     format_doc(
         header,
-        "Base class for the visitor pattern for the AST.\n\n"
-        "To operate on the AST, derive from this class, describe your "
+        "Base class for the visitor pattern for the tree.\n\n"
+        "To operate on the tree, derive from this class, describe your "
         "operation by overriding the appropriate visit functions. and then "
         "call `node->visit(your_visitor)`. The default implementations for "
         "the node-specific functions fall back to the more generic functions, "
@@ -292,7 +387,7 @@ static void generate_dumper_class(
 ) {
 
     // Print class header.
-    format_doc(header, "Visitor class that debug-dumps an AST to a stream");
+    format_doc(header, "Visitor class that debug-dumps a tree to a stream");
     header << "class Dumper : public RecursiveVisitor {" << std::endl;
     header << "protected:" << std::endl << std::endl;
     format_doc(header, "Output stream to dump to.", "    ");
@@ -432,7 +527,7 @@ int generate(
 
     // Check command line and open files.
     if (argc != 3) {
-        std::cerr << "Usage: ast-gen <header_dir> <source_dir>" << std::endl;
+        std::cerr << "Usage: generate <header_dir> <source_dir>" << std::endl;
         return 1;
     }
     auto header = std::ofstream(std::string(argv[1]) + "/cqasm-" + name + "-gen.hpp");
@@ -455,14 +550,40 @@ int generate(
         }
     );
 
+    // Figure out which types we need.
+    bool uses_maybe = false;
+    bool uses_one = false;
+    bool uses_any = false;
+    bool uses_many = false;
+    for (auto &node : nodes) {
+        for (auto &child : node->children) {
+            switch (child.type) {
+                case Maybe:   uses_maybe =   true; break;
+                case One:     uses_one =     true; break;
+                case Any:     uses_any =     true; break;
+                case Many:    uses_many =    true; break;
+                default: ;
+            }
+        }
+    }
+
     // Header for the header file.
     header << "#ifndef _CQASM_" << upper_name << "_GEN_HPP_INCLUDED_" << std::endl;
     header << "#define _CQASM_" << upper_name << "_GEN_HPP_INCLUDED_" << std::endl;
     header << std::endl;
-    header << "#include \"cqasm-" << name << "-head.hpp\"" << std::endl;
+    header << "#include <iostream>" << std::endl;
+    header << "#include \"cqasm-tree.hpp\"" << std::endl;
+    header << "#include \"cqasm-primitives.hpp\"" << std::endl;
     header << std::endl;
     header << "namespace cqasm {" << std::endl;
     header << "namespace " << name << " {" << std::endl;
+    header << std::endl;
+    header << "// Base classes used to construct the tree." << std::endl;
+    header << "using Base = ::cqasm::tree::Base;" << std::endl;
+    if (uses_maybe)    header << "template <class T> using Maybe = ::cqasm::tree::Maybe<T>;" << std::endl;
+    if (uses_one)      header << "template <class T> using One   = ::cqasm::tree::One<T>;" << std::endl;
+    if (uses_any)      header << "template <class T> using Any   = ::cqasm::tree::Any<T>;" << std::endl;
+    if (uses_many)     header << "template <class T> using Many  = ::cqasm::tree::Many<T>;" << std::endl;
     header << std::endl;
 
     // Header for the source file.
@@ -475,30 +596,22 @@ int generate(
     source << "namespace " << name << " {" << std::endl;
     source << std::endl;
 
-    // Generate the NodeType enum.
-    std::vector<std::string> variants;
-    for (auto &node : nodes) {
-        if (node->derived.empty()) {
-            variants.push_back(node->title_case_name);
-        }
-    }
-    format_doc(header, "Enumeration of all ast node types.");
-    header << "enum class NodeType {" << std::endl;
-    for (size_t i = 0; i < variants.size(); i++) {
-        header << "    " << variants[i];
-        if (i < variants.size() - 1) {
-            header << ",";
-        }
-        header << std::endl;
-    }
-    header << "};" << std::endl << std::endl;
-
     // Generate forward references for all the classes.
     header << "// Forward declarations for " << name << " nodes." << std::endl;
+    header << "class Node;" << std::endl;
     for (auto &node : nodes) {
         header << "class " << node->title_case_name << ";" << std::endl;
     }
+    header << "class Visitor;" << std::endl;
+    header << "class RecursiveVisitor;" << std::endl;
+    header << "class Dumper;" << std::endl;
     header << std::endl;
+
+    // Generate the NodeType enum.
+    generate_enum(header, nodes);
+
+    // Generate the base class.
+    generate_base_class(header, source, nodes);
 
     // Generate the node classes.
     for (auto &node : nodes) {
@@ -510,15 +623,23 @@ int generate(
     generate_recursive_visitor_class(header, source, nodes);
     generate_dumper_class(header, source, nodes);
 
-    // Footer for the header file.
+    // Close the namespaces.
     header << "} // namespace " << name << std::endl;
-    header << "} // namespace cqasm" << std::endl;
-    header << std::endl;
-    header << "#endif" << std::endl;
-
-    // Footer for the source file.
     source << "} // namespace " << name << std::endl;
+    header << "} // namespace cqasm" << std::endl << std::endl;
     source << "} // namespace cqasm" << std::endl;
+
+    // Overload the stream write operator.
+    format_doc(header, "Stream << overload for AST nodes (writes debug dump).");
+    header << "std::ostream& operator<<(std::ostream& os, const cqasm::" << name << "::Node& object);" << std::endl << std::endl;
+    format_doc(source, "Stream << overload for AST nodes (writes debug dump).");
+    source << "std::ostream& operator<<(std::ostream& os, const cqasm::" << name << "::Node& object) {" << std::endl;
+    source << "    const_cast<cqasm::" << name << "::Node&>(object).dump(os);" << std::endl;
+    source << "    return os;" << std::endl;
+    source << "}" << std::endl << std::endl;
+
+    // Footer for the header file.
+    header << "#endif" << std::endl;
 
     return 0;
 }

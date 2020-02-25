@@ -5,14 +5,6 @@ namespace cqasm {
 namespace ast {
 
 /**
- * Dumps this node.
- */
-void Node::dump(std::ostream &out) {
-    auto dumper = Dumper(out);
-    visit(dumper);
-}
-
-/**
  * Pushes a string fragment into the string.
  */
 void StringBuilder::push_string(const std::string &str) {
@@ -42,11 +34,3 @@ void StringBuilder::push_escape(const std::string &escape) {
 
 } // namespace ast
 } // namespace cqasm
-
-/**
- * Stream << overload for AST nodes (writes debug dump).
- */
-std::ostream& operator<<(std::ostream& os, const cqasm::ast::Node& object) {
-    const_cast<cqasm::ast::Node&>(object).dump(os);
-    return os;
-}

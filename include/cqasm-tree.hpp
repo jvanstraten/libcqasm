@@ -716,17 +716,6 @@ public:
 
 };
 
-/**
- * Code snippit for the `using` statements to make use of these tree base types
- * in a namespace for a certain kind of tree.
- */
-#define USING_CQASM_TREE                                        \
-    using Base = ::cqasm::tree::Base;                           \
-    template <class T> using Maybe = ::cqasm::tree::Maybe<T>;   \
-    template <class T> using One   = ::cqasm::tree::One<T>;     \
-    template <class T> using Any   = ::cqasm::tree::Any<T>;     \
-    template <class T> using Many  = ::cqasm::tree::Many<T>
-
 } // namespace tree
 } // namespace cqasm
 

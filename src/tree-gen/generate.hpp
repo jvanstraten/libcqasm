@@ -40,6 +40,11 @@ enum ChildType {
     Str,
 
     /**
+     * Boolean primitive.
+     */
+    Bool,
+
+    /**
      * Integer primitive.
      */
     Int,
@@ -48,6 +53,21 @@ enum ChildType {
      * Real number primitive.
      */
     Real,
+
+    /**
+     * Real number matrix primitive.
+     */
+    RMatrix,
+
+    /**
+     * Complex number primitive.
+     */
+    Complex,
+
+    /**
+     * Complex number matrix primitive.
+     */
+    CMatrix,
 
     /**
      * Vector of integers representing a version.

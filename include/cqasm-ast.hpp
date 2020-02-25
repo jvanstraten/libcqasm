@@ -3,7 +3,7 @@
  * from `cqasm::tree`.
  *
  * The `cqasm::ast::Node` base class derives from `cqasm::tree::Node`, adding
- * the `visit()` and `dump()` functions.
+ * a few extra functions.
  *
  * The `visit()` function is used for the visitor pattern. It takes a
  * user-implemented object derived from `Visitor` (also defined here), which
@@ -24,6 +24,31 @@
  *    is useful when the goal is to flatten the recursive structure in some
  *    way.
  *
+ * Besides the visitor pattern, you can also do Rust-like `if let` unpacking
+ * using the `as_<type>` functions. They return an appropriately cast pointer
+ * that is non-null if and only if the node is of the correct type. Making use
+ * of the fact that null pointers cast to false and that we can declare
+ * variables inside `if` statement expressions (just like we can in `for`
+ * loops), we can do the following:
+ *
+ * ```c++
+ * Node node = ...;
+ * if (auto exp = node.as_string_literal()) {
+ *     std::cout << exp->value << std::endl;
+ * }
+ * ```
+ *
+ * You can also emulate Rust-like case statements, either as a chain of
+ * the above, or using the `type()` function. The latter returns a C enum
+ * with all possible (leaf) types represented in it that you can switch over.
+ * The unpacking/matching functionality of Rust is not automatic though, of
+ * course. C++ can't do that.
+ *
+ * The equality and inequality operator are defined to do exact matching
+ * except for annotation objects added to the nodes, which are ignored (not to
+ * be confused with the Annotation AST nodes; these are an intrinsic part of
+ * the grammar and are thus matched like anything else).
+ *
  * `dump()` simply uses a predefined visistor class to produce a debug dump.
  * It can be passed any output stream, so you can dump to a string stream to
  * get the result as a string, if you want. There is also an overload for
@@ -38,8 +63,33 @@
 #ifndef _CQASM_AST_HPP_INCLUDED_
 #define _CQASM_AST_HPP_INCLUDED_
 
-#include <stdexcept>
-#include "cqasm-ast-head.hpp"
 #include "cqasm-ast-gen.hpp"
+
+namespace cqasm {
+namespace ast {
+
+/**
+ * Special/temporary string builder node, used to build strings from fragments
+ * and escape sequences while parsing. This is abstracted out of the AST; it
+ * should never appear after parsing completes.
+ */
+class StringBuilder : public cqasm::tree::Base {
+public:
+    std::ostringstream stream;
+
+    /**
+     * Pushes a string fragment into the string.
+     */
+    void push_string(const std::string &str);
+
+    /**
+     * Pushes an escape sequence into the string.
+     */
+    void push_escape(const std::string &escape);
+
+};
+
+} // namespace ast
+} // namespace cqasm
 
 #endif
