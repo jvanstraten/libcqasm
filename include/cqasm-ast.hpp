@@ -64,6 +64,8 @@
 #define _CQASM_AST_HPP_INCLUDED_
 
 #include "cqasm-ast-gen.hpp"
+#include <iostream>
+#include <sstream>
 
 namespace cqasm {
 namespace ast {

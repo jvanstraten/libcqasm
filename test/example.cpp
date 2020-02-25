@@ -8,6 +8,6 @@ TEST(test, test) {
     for (auto err : r.errors) {
         EXPECT_EQ(err, "");
     }
-//     std::cerr << *r.ast_root.val << std::endl;
+//     std::cerr << *r.ast_root << std::endl;
 //     EXPECT_TRUE(false);
 }

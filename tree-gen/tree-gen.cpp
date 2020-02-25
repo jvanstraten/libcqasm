@@ -1,7 +1,11 @@
 #include <ios>
 #include <fstream>
 #include <iostream>
-#include "generate.hpp"
+#include <cctype>
+#include <unordered_set>
+#include "tree-gen.hpp"
+#include "parser.hpp"
+#include "lexer.hpp"
 
 /**
  * Formats a docstring.
@@ -164,7 +168,7 @@ static void generate_node_class(
     if (!node.doc.empty()) {
         format_doc(header, node.doc);
     }
-    header << "class " << node.title_case_name << ": public ";
+    header << "class " << node.title_case_name << " : public ";
     if (node.parent) {
          header << node.parent->title_case_name;
     } else {
@@ -180,18 +184,11 @@ static void generate_node_class(
         }
         header << "    ";
         switch (child.type) {
-            case Maybe:   header << "::cqasm::tree::Maybe<" << child.node_type->title_case_name << "> "; break;
-            case One:     header << "::cqasm::tree::One<"   << child.node_type->title_case_name << "> "; break;
-            case Any:     header << "::cqasm::tree::Any<"   << child.node_type->title_case_name << "> "; break;
-            case Many:    header << "::cqasm::tree::Many<"  << child.node_type->title_case_name << "> "; break;
-            case Str:     header << "::cqasm::primitives::Str ";     break;
-            case Bool:    header << "::cqasm::primitives::Bool ";    break;
-            case Int:     header << "::cqasm::primitives::Int ";     break;
-            case Real:    header << "::cqasm::primitives::Real ";    break;
-            case RMatrix: header << "::cqasm::primitives::RMatrix "; break;
-            case Complex: header << "::cqasm::primitives::Complex "; break;
-            case CMatrix: header << "::cqasm::primitives::CMatrix "; break;
-            case Version: header << "::cqasm::primitives::Version "; break;
+            case Maybe:   header << "Maybe<" << child.node_type->title_case_name << "> "; break;
+            case One:     header << "One<"   << child.node_type->title_case_name << "> "; break;
+            case Any:     header << "Any<"   << child.node_type->title_case_name << "> "; break;
+            case Many:    header << "Many<"  << child.node_type->title_case_name << "> "; break;
+            case Prim:    header << child.prim_type << " "; break;
         }
         header << child.name << ";" << std::endl << std::endl;
     }
@@ -214,9 +211,6 @@ static void generate_node_class(
                     case Any:
                     case Many:
                         source << "    if (!" << child.name << ".is_complete()) return false;" << std::endl;
-                        break;
-                    case Version:
-                        source << "    if (" << child.name << ".empty()) return false;" << std::endl;
                         break;
                     default:
                         break;
@@ -383,7 +377,8 @@ static void generate_recursive_visitor_class(
 static void generate_dumper_class(
     std::ofstream &header,
     std::ofstream &source,
-    Nodes &nodes
+    Nodes &nodes,
+    std::string &source_location
 ) {
 
     // Print class header.
@@ -434,9 +429,11 @@ static void generate_dumper_class(
         source << "        out << \"!\";" << std::endl;
         source << "    }" << std::endl;
         source << "    out << \"" << node->title_case_name << "(\";" << std::endl;
-        source << "    if (node.has_annotation<SourceLocation>()) {" << std::endl;
-        source << "        out << \" # \" << *node.get_annotation<SourceLocation>();" << std::endl;
-        source << "    }" << std::endl;
+        if (!source_location.empty()) {
+            source << "    if (node.has_annotation<" << source_location << ">()) {" << std::endl;
+            source << "        out << \" # \" << *node.get_annotation<" << source_location << ">();" << std::endl;
+            source << "    }" << std::endl;
+        }
         source << "    out << std::endl;" << std::endl;
         if (!children.empty()) {
             source << "    indent++;" << std::endl;
@@ -487,20 +484,8 @@ static void generate_dumper_class(
                         source << "    }" << std::endl;
                         break;
 
-                    case Str:
-                    case Int:
-                    case Real:
+                    case Prim:
                         source << "    out << node." << child.name << " << std::endl;" << std::endl;
-                        break;
-
-                    case Version:
-                        source << "    for (size_t i = 0; i < node." << child.name << ".size(); i++) {" << std::endl;
-                        source << "        if (i) {" << std::endl;
-                        source << "            out << \".\";" << std::endl;
-                        source << "        }" << std::endl;
-                        source << "        out << node." << child.name << "[i];" << std::endl;
-                        source << "    }" << std::endl;
-                        source << "    out << std::endl;" << std::endl;
                         break;
 
                 }
@@ -518,37 +503,63 @@ static void generate_dumper_class(
 /**
  * Main function for generating the the header and source file for a tree.
  */
-int generate(
+int main(
     int argc,
-    char *argv[],
-    const std::string &name,
-    Nodes &nodes
+    char *argv[]
 ) {
 
     // Check command line and open files.
-    if (argc != 3) {
-        std::cerr << "Usage: generate <header_dir> <source_dir>" << std::endl;
+    if (argc != 4) {
+        std::cerr << "Usage: tree-gen <spec-file> <header-dir> <source-dir>" << std::endl;
         return 1;
     }
-    auto header = std::ofstream(std::string(argv[1]) + "/cqasm-" + name + "-gen.hpp");
+
+    // Create the scanner.
+    yyscan_t scanner = nullptr;
+    int retcode = yylex_init(&scanner);
+    if (retcode) {
+        std::cerr << "Failed to construct scanner: " << strerror(retcode) << std::endl;
+        return 1;
+    }
+
+    // Try to open the file and read it to an internal string.
+    auto filename = std::string(argv[1]);
+    FILE *fptr = fopen(filename.c_str(), "r");
+    if (!fptr) {
+        std::cerr << "Failed to open input file " << filename << ": " << strerror(errno) << std::endl;
+        return 1;
+    }
+    yyset_in(fptr, scanner);
+
+    // Do the actual parsing.
+    Specification specification;
+    retcode = yyparse(scanner, specification);
+    if (retcode == 2) {
+        std::cerr << "Out of memory while parsing " << filename << std::endl;
+        return 1;
+    } else if (retcode) {
+        std::cerr << "Failed to parse " << filename << std::endl;
+        return 1;
+    }
+    try {
+        specification.build();
+    } catch (std::exception &e) {
+        std::cerr << "Analysis error: " << e.what() << std::endl;
+        return 1;
+    }
+    auto nodes = specification.nodes;
+
+    // Open the output files.
+    auto header = std::ofstream(std::string(argv[2]) + "/" + specification.header_filename);
     if (!header.is_open()) {
         std::cerr << "Failed to open header file for writing" << std::endl;
         return 1;
     }
-    auto source = std::ofstream(std::string(argv[2]) + "/cqasm-" + name + "-gen.cpp");
+    auto source = std::ofstream(std::string(argv[3]) + "/" + specification.source_filename);
     if (!source.is_open()) {
         std::cerr << "Failed to open source file for writing" << std::endl;
         return 1;
     }
-
-    // Uppercase the name.
-    std::string upper_name = name;
-    std::transform(
-        upper_name.begin(), upper_name.end(), upper_name.begin(),
-        [](unsigned char c){
-            return std::toupper(c);
-        }
-    );
 
     // Figure out which types we need.
     bool uses_maybe = false;
@@ -558,46 +569,66 @@ int generate(
     for (auto &node : nodes) {
         for (auto &child : node->children) {
             switch (child.type) {
-                case Maybe:   uses_maybe =   true; break;
-                case One:     uses_one =     true; break;
-                case Any:     uses_any =     true; break;
-                case Many:    uses_many =    true; break;
+                case Maybe: uses_maybe = true; break;
+                case One:   uses_one   = true; break;
+                case Any:   uses_any   = true; break;
+                case Many:  uses_many  = true; break;
                 default: ;
             }
         }
     }
 
+    // Generate the include guard name.
+    std::string include_guard = specification.header_filename;
+    std::transform(
+        include_guard.begin(), include_guard.end(), include_guard.begin(),
+        [](unsigned char c){
+            if (std::isalnum(c)) {
+                return std::toupper(c);
+            } else {
+                return static_cast<int>('_');
+            }
+        }
+    );
+
     // Header for the header file.
-    header << "#ifndef _CQASM_" << upper_name << "_GEN_HPP_INCLUDED_" << std::endl;
-    header << "#define _CQASM_" << upper_name << "_GEN_HPP_INCLUDED_" << std::endl;
+    header << "#ifndef _" << include_guard << "_INCLUDED_" << std::endl;
+    header << "#define _" << include_guard << "_INCLUDED_" << std::endl;
     header << std::endl;
     header << "#include <iostream>" << std::endl;
-    header << "#include \"cqasm-tree.hpp\"" << std::endl;
-    header << "#include \"cqasm-primitives.hpp\"" << std::endl;
+    for (auto &include : specification.includes) {
+        header << "#" << include << std::endl;
+    }
     header << std::endl;
-    header << "namespace cqasm {" << std::endl;
-    header << "namespace " << name << " {" << std::endl;
+    for (auto &name : specification.namespaces) {
+        header << "namespace " << name << " {" << std::endl;
+    }
     header << std::endl;
     header << "// Base classes used to construct the tree." << std::endl;
-    header << "using Base = ::cqasm::tree::Base;" << std::endl;
-    if (uses_maybe)    header << "template <class T> using Maybe = ::cqasm::tree::Maybe<T>;" << std::endl;
-    if (uses_one)      header << "template <class T> using One   = ::cqasm::tree::One<T>;" << std::endl;
-    if (uses_any)      header << "template <class T> using Any   = ::cqasm::tree::Any<T>;" << std::endl;
-    if (uses_many)     header << "template <class T> using Many  = ::cqasm::tree::Many<T>;" << std::endl;
+    std::string tree_namespace = "";
+    if (!specification.tree_namespace.empty()) {
+        tree_namespace = "::" + specification.tree_namespace + "::";
+    }
+    header << "using Base = " << tree_namespace << "Base;" << std::endl;
+    if (uses_maybe)    header << "template <class T> using Maybe = " << tree_namespace << "Maybe<T>;" << std::endl;
+    if (uses_one)      header << "template <class T> using One   = " << tree_namespace << "One<T>;" << std::endl;
+    if (uses_any)      header << "template <class T> using Any   = " << tree_namespace << "Any<T>;" << std::endl;
+    if (uses_many)     header << "template <class T> using Many  = " << tree_namespace << "Many<T>;" << std::endl;
     header << std::endl;
 
     // Header for the source file.
-    source << "#include \"cqasm-" << name << "-gen.hpp\"" << std::endl;
-    source << "#include \"cqasm-analyzer.hpp\"" << std::endl;
+    for (auto &include : specification.src_includes) {
+        source << "#" << include << std::endl;
+    }
+    source << "#include \"" << specification.header_filename << "\"" << std::endl;
     source << std::endl;
-    source << "using namespace cqasm;" << std::endl;
-    source << std::endl;
-    source << "namespace cqasm {" << std::endl;
-    source << "namespace " << name << " {" << std::endl;
+    for (auto &name : specification.namespaces) {
+        source << "namespace " << name << " {" << std::endl;
+    }
     source << std::endl;
 
     // Generate forward references for all the classes.
-    header << "// Forward declarations for " << name << " nodes." << std::endl;
+    header << "// Forward declarations for all classes." << std::endl;
     header << "class Node;" << std::endl;
     for (auto &node : nodes) {
         header << "class " << node->title_case_name << ";" << std::endl;
@@ -614,27 +645,49 @@ int generate(
     generate_base_class(header, source, nodes);
 
     // Generate the node classes.
-    for (auto &node : nodes) {
-        generate_node_class(header, source, *node);
+    std::unordered_set<std::string> generated;
+    for (auto node : nodes) {
+        if (generated.count(node->snake_case_name)) {
+            continue;
+        }
+        auto ancestors = Nodes();
+        while (node) {
+            ancestors.push_back(node);
+            node = node->parent;
+        }
+        for (auto node_it = ancestors.rbegin(); node_it != ancestors.rend(); node_it++) {
+            node = *node_it;
+            if (generated.count(node->snake_case_name)) {
+                continue;
+            }
+            generated.insert(node->snake_case_name);
+            generate_node_class(header, source, *node);
+        }
     }
 
     // Generate the visitor classes.
     generate_visitor_base_class(header, source, nodes);
     generate_recursive_visitor_class(header, source, nodes);
-    generate_dumper_class(header, source, nodes);
+    generate_dumper_class(header, source, nodes, specification.source_location);
 
     // Close the namespaces.
-    header << "} // namespace " << name << std::endl;
-    source << "} // namespace " << name << std::endl;
-    header << "} // namespace cqasm" << std::endl << std::endl;
-    source << "} // namespace cqasm" << std::endl;
+    for (auto name_it = specification.namespaces.rbegin(); name_it != specification.namespaces.rend(); name_it++) {
+        header << "} // namespace " << *name_it << std::endl;
+        source << "} // namespace " << *name_it << std::endl;
+    }
+    header << std::endl;
+    source << std::endl;
 
     // Overload the stream write operator.
+    std::string name_space = "";
+    for (auto &name : specification.namespaces) {
+        name_space += "::" + name;
+    }
     format_doc(header, "Stream << overload for AST nodes (writes debug dump).");
-    header << "std::ostream& operator<<(std::ostream& os, const cqasm::" << name << "::Node& object);" << std::endl << std::endl;
+    header << "std::ostream& operator<<(std::ostream& os, const " << name_space << "::Node& object);" << std::endl << std::endl;
     format_doc(source, "Stream << overload for AST nodes (writes debug dump).");
-    source << "std::ostream& operator<<(std::ostream& os, const cqasm::" << name << "::Node& object) {" << std::endl;
-    source << "    const_cast<cqasm::" << name << "::Node&>(object).dump(os);" << std::endl;
+    source << "std::ostream& operator<<(std::ostream& os, const " << name_space << "::Node& object) {" << std::endl;
+    source << "    const_cast<" << name_space << "::Node&>(object).dump(os);" << std::endl;
     source << "    return os;" << std::endl;
     source << "}" << std::endl << std::endl;
 

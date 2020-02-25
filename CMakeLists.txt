@@ -30,6 +30,11 @@ set(FLEX_VERSION_REQUIRED 2.6.1)
 set(BISON_VERSION_REQUIRED 3.0)
 include(cmake/flex-bison.cmake)
 
+# Include tree-gen, a custom utility to generate classes for typed tree-like
+# structures and enums with variants containing data. This exposes the
+# generate_tree() function.
+add_subdirectory(tree-gen)
+
 # Generate the lexer.
 flex_target(
     cqasm-lexer
@@ -53,29 +58,11 @@ add_flex_bison_dependency(
     cqasm-parser
 )
 
-# Generate the AST node class definitions.
-add_executable(
-    ast-gen
-    EXCLUDE_FROM_ALL
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/tree-gen/ast.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/tree-gen/generate.cpp"
-)
-
-target_include_directories(
-    ast-gen
-    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/tree-gen"
-)
-
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include")
-
-add_custom_command(
-    OUTPUT
-        "${CMAKE_CURRENT_BINARY_DIR}/include/cqasm-ast-gen.hpp"
-        "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
-    COMMAND
-        ast-gen
-        "${CMAKE_CURRENT_BINARY_DIR}/include"
-        "${CMAKE_CURRENT_BINARY_DIR}"
+# Generate the abstract syntax tree classes.
+generate_tree(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-ast.tree"
+    "${CMAKE_CURRENT_BINARY_DIR}/include/cqasm-ast-gen.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
 )
 
 # Main cQASM library.
@@ -84,6 +71,7 @@ add_library(
     ${BISON_cqasm-parser_OUTPUTS}
     ${FLEX_cqasm-lexer_OUTPUTS}
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-primitives.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-ast.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-analyzer.cpp"

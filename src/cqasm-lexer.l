@@ -5,7 +5,8 @@
 %{
     #include "cqasm-parser.hpp"
 
-    #define DEBUG(...) fprintf(stderr, __VA_ARGS__)
+    //#define DEBUG(...) fprintf(stderr, __VA_ARGS__)
+    #define DEBUG(...)
 
     #define YY_USER_ACTION yylloc->last_column += yyleng;
     #define LOCATION_RESET \

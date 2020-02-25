@@ -280,8 +280,8 @@ IndexList       : IndexList ',' IndexEntry                                      
 AnnotationName  : Identifier '.' Identifier                                     { NEW($$, AnnotationData); $$->interface.set_raw($1); $$->operation.set_raw($1); }
                 ;
 
-AnnotationData  : AnnotationName                                                { FROM($$, $1); }
-                | AnnotationName '(' ')'                                        { FROM($$, $1); }
+AnnotationData  : AnnotationName                                                { FROM($$, $1); $$->operands.set_raw(new ExpressionList()); }
+                | AnnotationName '(' ')'                                        { FROM($$, $1); $$->operands.set_raw(new ExpressionList()); }
                 | AnnotationName '(' ExpressionList ')'                         { FROM($$, $1); $$->operands.set_raw($3); }
                 ;
 

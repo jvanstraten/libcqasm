@@ -65,4 +65,9 @@ public:
 } // namespace primitives
 } // namespace cqasm
 
+/**
+ * Stream << overload for version nodes.
+ */
+std::ostream& operator<<(std::ostream& os, const ::cqasm::primitives::Version& object);
+
 #endif
