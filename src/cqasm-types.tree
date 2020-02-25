@@ -1,0 +1,120 @@
+
+
+# Represents a cQASM type.
+type {
+
+    # Type of a single qubit.
+    qubit_type {}
+
+    # Type of a single classical bit.
+    bit_type {}
+
+    # Type of an integer (signed 64-bit).
+    int_type {}
+
+    # Type of a real number (IEEE double).
+    real_type {}
+
+    # Type of a complex number (2x IEEE double).
+    complex_type {}
+
+    # Type of an arbitrary string.
+    string_type {}
+
+    # Type of a JSON string.
+    json_type {}
+
+    # Type of a matrix. Also used for one-dimensional arrays and vectors.
+    matrix_type {
+
+        # Inner type.
+        inner: One<type>;
+
+        # Number of rows. Negative indicates that the value is unconstrained.
+        # Must be one or more otherwise.
+        num_rows: Int;
+
+        # Number of columns. Negative indicates that the value is
+        # unconstrained. Can be zero, unlike num_rows.
+        num_cols: Int;
+
+    }
+
+}
+
+# Represents a constant/literal value.
+value {
+
+    # Represents a value of type bit.
+    bit_value {
+
+        # The contained value.
+        value: Bool;
+
+    }
+
+    # Represents a value of type int.
+    int_value {
+
+        # The contained value.
+        value: Int;
+
+    }
+
+    # Represents a value of type real.
+    real_value {
+
+        # The contained value.
+        value: Real;
+
+    }
+
+    # Represents a value of type complex.
+    complex_value {
+
+        # The contained value.
+        value: Complex;
+
+    }
+
+    # Represents a value of type string.
+    string_value {
+
+        # The contained value.
+        value: Str;
+
+    }
+
+    # Represents a value of type json.
+    json_value {
+
+        # The contained value.
+        value: Json;
+
+    }
+
+    # Represents a value of type matrix.
+    matrix_value {
+
+        # The contained
+        rows: Many<matrix_row_value>;
+
+    }
+
+}
+
+# Represents a qubit.
+qubit_ref {
+
+    # Qubit index unique within the file, starting at 0.
+    index: Int;
+
+}
+
+# Represents a measurement bit.
+measurement_ref {
+
+    # The qubit register this measurement register corresponds to.
+    qubit: One<qubit_ref>;
+
+}
