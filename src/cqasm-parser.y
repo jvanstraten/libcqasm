@@ -52,8 +52,6 @@
     char           	*str;
     IntegerLiteral  *ilit;
     FloatLiteral    *flit;
-    MatrixLiteral1  *mat1;
-    MatrixLiteral2  *mat2;
     MatrixLiteral   *mat;
     StringBuilder   *strb;
     StringLiteral   *slit;
@@ -83,9 +81,7 @@
 /* Typenames for nonterminals */
 %type <ilit> IntegerLiteral
 %type <flit> FloatLiteral
-%type <mat1> MatrixLiteral1
-%type <mat2> MatrixLiteral2 MatrixLiteral2c
-%type <mat>  MatrixLiteral
+%type <mat>  MatrixRows MatrixLiteral
 %type <strb> StringBuilder
 %type <slit> StringLiteral
 %type <jlit> JsonLiteral
@@ -184,23 +180,13 @@ IntegerLiteral  : INT_LITERAL                                                   
 FloatLiteral    : FLOAT_LITERAL                                                 { NEW($$, FloatLiteral); $$->value = std::strtod($1, nullptr); std::free($1); }
                 ;
 
-/* Old matrix syntax, specified as a row-major flattened list of the
-real/imaginary value pairs.*/
-MatrixLiteral1  : '[' ExpressionList ']'                                        { NEW($$, MatrixLiteral1); $$->pairs.set_raw($2); }
+/* Matrix syntax. */
+MatrixRows      : MatrixRows Newline ExpressionList                             { FROM($$, $1); $$->rows.add_raw($3); }
+                | ExpressionList                                                { NEW($$, MatrixLiteral); $$->rows.add_raw($1); }
                 ;
 
-/* Mew matrix syntax with explitic structure and using expressions for
-representing the complex numbers. */
-MatrixLiteral2c : MatrixLiteral2c Newline ExpressionList                        { FROM($$, $1); $$->rows.add_raw($3); }
-                | ExpressionList                                                { NEW($$, MatrixLiteral2); $$->rows.add_raw($1); }
-                ;
-
-MatrixLiteral2  : MAT_OPEN OptNewline MatrixLiteral2c OptNewline MAT_CLOSE      { FROM($$, $3); }
-                ;
-
-/* Either matrix syntax. */
-MatrixLiteral   : MatrixLiteral1                                                { FROM($$, $1); }
-                | MatrixLiteral2                                                { FROM($$, $1); }
+MatrixLiteral   : '[' OptNewline MatrixRows OptNewline ']'                      { FROM($$, $3); }
+                | '[' OptNewline ']'                                            { NEW($$, MatrixLiteral); $$->rows.add_raw(new ExpressionList()); }
                 ;
 
 /* String builder. This accumulates JSON/String data, mostly

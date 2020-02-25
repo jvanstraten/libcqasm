@@ -44,26 +44,16 @@ expression {
 
     }
 
-    # Represents a matrix literal.
+    # Represents a matrix literal. An empty matrix is defined to have one row
+    # with zero elements. Arrays are represented as a matrix with one row.
+    # Row vs column vectors are different by syntax, depending on whether
+    # comma separation vs newline/semicolon is respectively used. While the
+    # AST allows a different number of elements for each row, this is illegal;
+    # it is caught at parse-time.
     matrix_literal {
 
-        # Represents a square matrix literal represented as a flattened list
-        # of row-major real/imaginary expression pairs.
-        matrix_literal_1 {
-
-            # The list of row-major real/imaginary expression pairs.
-            pairs: One<expression_list>;
-
-        }
-
-        # Represents a matrix literal represented as a list of rows, which are
-        # in turn lists of complex expressions.
-        matrix_literal_2 {
-
-            # The list of rows in the matrix.
-            rows: Many<expression_list>;
-
-        }
+        # The list of rows in the matrix.
+        rows: Many<expression_list>;
 
     }
 
