@@ -65,6 +65,13 @@ generate_tree(
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
 )
 
+# Generate the semantic tree classes.
+generate_tree(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-semantic.tree"
+    "${CMAKE_CURRENT_BINARY_DIR}/include/cqasm-semantic-gen.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-semantic-gen.cpp"
+)
+
 # Main cQASM library.
 add_library(
     cqasm
@@ -74,6 +81,7 @@ add_library(
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-primitives.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-ast.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-semantic-gen.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-analyzer.cpp"
 )
 

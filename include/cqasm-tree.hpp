@@ -215,7 +215,8 @@ public:
      * Adds an annotation object to this node.
      *
      * Annotations are keyed by their type. That is, a node can contain zero or
-     * one annotation for each C++ type.
+     * one annotation for every C++ type, meaning you can attach any data you
+     * want to a node by defining your own struct or class.
      *
      * The annotations object is copied into the node. If you don't want to
      * make a copy, you can store a (smart) pointer to the object instead, in
@@ -230,7 +231,8 @@ public:
      * Adds an annotation object to this node.
      *
      * Annotations are keyed by their type. That is, a node can contain zero or
-     * one annotation for each C++ type.
+     * one annotation for every C++ type, meaning you can attach any data you
+     * want to a node by defining your own struct or class.
      *
      * The annotations object is moved into the node.
      */
@@ -272,6 +274,14 @@ public:
         } catch (const std::out_of_range&) {
             return nullptr;
         }
+    }
+
+    /**
+     * Removes the annotation object of the given type, if any.
+     */
+    template <typename T>
+    void erase_annotation() {
+        annotations.erase(std::type_index(typeid(T)));
     }
 
 };

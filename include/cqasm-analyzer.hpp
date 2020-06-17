@@ -37,7 +37,7 @@ public:
  *
  * @see Analyzer
  */
-class AnalyzerInternals {
+class ParseHelper {
 public:
 
     /**
@@ -59,17 +59,17 @@ private:
     friend class Analyzer;
 
     /**
-     * Construct the analyzer internals for the given filename, and analyze
-     * the file.
+     * Construct the parse helper for the given filename, and analyze the file
+     * with flex/bison.
      */
-    AnalyzerInternals(const std::string &filename);
+    ParseHelper(const std::string &filename);
 
 public:
 
     /**
-     * Destroys the analyzer.
+     * Destroys the parse helper.
      */
-    virtual ~AnalyzerInternals();
+    virtual ~ParseHelper();
 
     /**
      * Pushes an error.

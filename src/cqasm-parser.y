@@ -13,13 +13,13 @@
 
 %code {
     int yylex(YYSTYPE* yylvalp, YYLTYPE* yyllocp, yyscan_t scanner);
-    void yyerror(YYLTYPE* yyllocp, yyscan_t scanner, cqasm::AnalyzerInternals &analyzer, const char* msg);
+    void yyerror(YYLTYPE* yyllocp, yyscan_t scanner, cqasm::ParseHelper &helper, const char* msg);
 }
 
 %code top {
     #define ADD_SOURCE_LOCATION(v)                  \
         v->set_annotation(cqasm::SourceLocation(    \
-            analyzer.result.filename,               \
+            helper.result.filename,                 \
             yyloc.first_line,                       \
             yyloc.first_column,                     \
             yyloc.last_line,                        \
@@ -45,7 +45,7 @@
 }
 
 %param { yyscan_t scanner }
-%parse-param { cqasm::AnalyzerInternals &analyzer }
+%parse-param { cqasm::ParseHelper &helper }
 
 /* YYSTYPE union */
 %union {
@@ -338,17 +338,17 @@ Program         : OptNewline VERSION Version Newline
                 ;
 
 /* Toplevel. */
-Root            : Program                                                       { analyzer.result.ast_root.set_raw($1); }
-                | error                                                         { analyzer.result.ast_root.set_raw(new ErroneousProgram()); }
+Root            : Program                                                       { helper.result.ast_root.set_raw($1); }
+                | error                                                         { helper.result.ast_root.set_raw(new ErroneousProgram()); }
                 ;
 
 %%
 
-void yyerror(YYLTYPE* yyllocp, yyscan_t unused, cqasm::AnalyzerInternals &analyzer, const char* msg) {
+void yyerror(YYLTYPE* yyllocp, yyscan_t unused, cqasm::ParseHelper &helper, const char* msg) {
     std::ostringstream sb;
-    sb << analyzer.result.filename
+    sb << helper.result.filename
        << ":"  << yyllocp->first_line
        << ":"  << yyllocp->first_column
        << ": " << msg;
-    analyzer.push_error(sb.str());
+    helper.push_error(sb.str());
 }

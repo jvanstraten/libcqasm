@@ -8,7 +8,7 @@ namespace cqasm {
  * Construct the analyzer internals for the given filename, and analyze
  * the file.
  */
-AnalyzerInternals::AnalyzerInternals(const std::string &filename) {
+ParseHelper::ParseHelper(const std::string &filename) {
     int retcode;
 
     // Store the filename.
@@ -52,7 +52,7 @@ AnalyzerInternals::AnalyzerInternals(const std::string &filename) {
 /**
  * Destroys the analyzer.
  */
-AnalyzerInternals::~AnalyzerInternals() {
+ParseHelper::~ParseHelper() {
     if (fptr) {
         fclose(fptr);
     }
@@ -64,7 +64,7 @@ AnalyzerInternals::~AnalyzerInternals() {
 /**
  * Pushes an error.
  */
-void AnalyzerInternals::push_error(const std::string &error) {
+void ParseHelper::push_error(const std::string &error) {
     result.errors.push_back(error);
 }
 
@@ -72,7 +72,7 @@ void AnalyzerInternals::push_error(const std::string &error) {
  * Analyzes the given cQASM file.
  */
 AnalysisResult Analyzer::analyze(const std::string &filename) {
-    return AnalyzerInternals(filename).result;
+    return ParseHelper(filename).result;
 }
 
 /**
