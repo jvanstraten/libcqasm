@@ -83,6 +83,7 @@ add_library(
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-semantic-gen.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-analyzer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-types.cpp"
 )
 
 # The src directory and binary directory (for generated header files) are

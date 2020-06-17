@@ -157,7 +157,7 @@ value {
     reference {
 
         # Represents a qubit, or a set of qubits for single-gate-multiple-qubit
-        # notation.
+        # notation. The indices must not repeat.
         qubit_refs {
 
             # Set of qubit indices referred to, starting at 0.
@@ -166,7 +166,8 @@ value {
         }
 
         # Represents a measurement bit, or a number of measurement bits for
-        # conditional gates with multiple conditions.
+        # conditional gates with multiple conditions. When there are multiple,
+        # the conditions are all AND'ed together.
         bit_refs {
 
             # The qubit index that this is a measurement bit for, starting at 0.
@@ -201,10 +202,21 @@ annotated {
     # Zero or more annotations attached to this object.
     annotations: Any<annotation_data>;
 
+    # Error model information.
+    error_model {
+
+        # Name as it appears in the cQASM file.
+        name: One<const_string>;
+
+        # Error model parameters.
+        parameters: Many<value>;
+
+    }
+
     # An instruction (a.k.a. gate).
     instruction {
 
-        # Name identifying the instruction.
+        # Name as it appears in the cQASM file.
         name: One<const_string>;
 
         # Optional condition (c- notation).
@@ -261,6 +273,9 @@ root {
 
         # Integer expression indicating the number of qubits.
         num_qubits: One<const_int>;
+
+        # Error model information.
+        error_model: Maybe<error_model>;
 
         # The list of subcircuit.
         kernels: Any<subcircuit>;

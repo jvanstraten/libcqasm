@@ -43,245 +43,22 @@
 #include <typeindex>
 #include <unordered_map>
 #include <functional>
+#include "cqasm-annotatable.hpp"
 
 namespace cqasm {
 namespace tree {
 
 /**
- * Utility class for carrying any kind of value. Basically, `std::any` within
- * C++11.
- */
-class Anything {
-private:
-
-    /**
-     * Pointer to the contained data, or nullptr if no data is contained.
-     */
-    void *data;
-
-    /**
-     * Function used to free the contained data.
-     */
-    std::function<void(void *data)> destructor;
-
-    /**
-     * Type information.
-     */
-    std::type_index type;
-
-    /**
-     * Constructs an Anything object.
-     */
-    Anything(void *data, std::function<void(void *data)> destructor, std::type_index type) :
-        data(data),
-        destructor(destructor),
-        type(type)
-    {}
-
-public:
-
-    /**
-     * Constructs an empty Anything object.
-     */
-    Anything() :
-        data(nullptr),
-        destructor([](void *data){}),
-        type(std::type_index(typeid(nullptr)))
-    {}
-
-    /**
-     * Constructs an Anything object by copying a value into it.
-     */
-    template <typename T>
-    static Anything make(const T &ob) {
-        return Anything(
-            new T(ob),
-            [](void *data) {
-                delete static_cast<T*>(data);
-            },
-            std::type_index(typeid(T))
-        );
-    }
-
-    /**
-     * Constructs an Anything object by moving a value into it.
-     */
-    template <typename T>
-    static Anything make(T &&ob) {
-        return Anything(
-            new T(std::move(ob)),
-            [](void *data) {
-                delete static_cast<T*>(data);
-            },
-            std::type_index(typeid(T))
-        );
-    }
-
-    /**
-     * Destructor.
-     */
-    ~Anything() {
-        if (data) {
-            destructor(data);
-        }
-    }
-
-    // Anything objects are not copyable, because type information is lost
-    // after the initial construction.
-    Anything(const Anything&) = delete;
-    Anything& operator=(const Anything&) = delete;
-
-    /**
-     * Move constructor.
-     */
-    Anything(Anything &&src) :
-        data(src.data),
-        destructor(std::move(src.destructor)),
-        type(std::move(src.type))
-    {
-        src.data = nullptr;
-    }
-
-    /**
-     * Move assignment.
-     */
-    Anything& operator=(Anything &&src) {
-        if (data) {
-            destructor(data);
-        }
-        data = src.data;
-        destructor = std::move(src.destructor);
-        type = std::move(src.type);
-        src.data = nullptr;
-        return *this;
-    }
-
-    /**
-     * Returns a mutable pointer to the contents.
-     *
-     * @throws std::bad_cast when the type is incorrect.
-     */
-    template <typename T>
-    T *get_mut() {
-        if (std::type_index(typeid(T)) != type) {
-            throw std::bad_cast();
-        }
-        return static_cast<T*>(data);
-    }
-
-    /**
-     * Returns a const pointer to the contents.
-     *
-     * @throws std::bad_cast when the type is incorrect.
-     */
-    template <typename T>
-    const T *get_const() const {
-        if (std::type_index(typeid(T)) != type) {
-            throw std::bad_cast();
-        }
-        return static_cast<T*>(data);
-    }
-
-};
-
-/**
  * Base class for all tree nodes.
  */
-class Base {
-private:
-
-    /**
-     * The annotations stored with this node.
-     */
-    std::unordered_map<std::type_index, std::shared_ptr<Anything>> annotations;
-
+class Base : public annotatable::Annotatable {
 public:
-
-    /**
-     * We're using inheritance, so we need a virtual destructor for proper
-     * cleanup.
-     */
-    virtual ~Base() {
-    };
 
     /**
      * Returns whether this object is complete/fully defined.
      */
     virtual bool is_complete() const {
         return true;
-    }
-
-    /**
-     * Adds an annotation object to this node.
-     *
-     * Annotations are keyed by their type. That is, a node can contain zero or
-     * one annotation for every C++ type, meaning you can attach any data you
-     * want to a node by defining your own struct or class.
-     *
-     * The annotations object is copied into the node. If you don't want to
-     * make a copy, you can store a (smart) pointer to the object instead, in
-     * which case the copied object is the pointer.
-     */
-    template <typename T>
-    void set_annotation(const T &ob) {
-        annotations[std::type_index(typeid(T))] = std::make_shared<Anything>(Anything::make<T>(ob));
-    }
-
-    /**
-     * Adds an annotation object to this node.
-     *
-     * Annotations are keyed by their type. That is, a node can contain zero or
-     * one annotation for every C++ type, meaning you can attach any data you
-     * want to a node by defining your own struct or class.
-     *
-     * The annotations object is moved into the node.
-     */
-    template <typename T>
-    void set_annotation(T &&ob) {
-        annotations[std::type_index(typeid(T))] = std::make_shared<Anything>(Anything::make<T>(std::move(ob)));
-    }
-
-    /**
-     * Returns whether this object holds an annotation object of the given
-     * type.
-     */
-    template <typename T>
-    bool has_annotation() const {
-        return annotations.count(std::type_index(typeid(T)));
-    }
-
-    /**
-     * Returns a mutable pointer to the annotation object of the given type
-     * held by this object, or `nullptr` if there is no such annotation.
-     */
-    template <typename T>
-    T *get_annotation() {
-        try {
-            return annotations.at(std::type_index(typeid(T)))->get_mut<T>();
-        } catch (const std::out_of_range&) {
-            return nullptr;
-        }
-    }
-
-    /**
-     * Returns an immutable pointer to the annotation object of the given type
-     * held by this object, or `nullptr` if there is no such annotation.
-     */
-    template <typename T>
-    const T *get_annotation() const {
-        try {
-            return annotations.at(std::type_index(typeid(T)))->get_const<T>();
-        } catch (const std::out_of_range&) {
-            return nullptr;
-        }
-    }
-
-    /**
-     * Removes the annotation object of the given type, if any.
-     */
-    template <typename T>
-    void erase_annotation() {
-        annotations.erase(std::type_index(typeid(T)));
     }
 
 };
@@ -299,6 +76,27 @@ protected:
     std::shared_ptr<T> val;
 
 public:
+
+    /**
+     * Constructor for an empty node.
+     */
+    Maybe() : val() {}
+
+    /**
+     * Constructor for a filled node (copy).
+     */
+    explicit Maybe(const T &value) : val(new T(value)) {}
+
+    /**
+     * Constructor for a filled node (move).
+     */
+    explicit Maybe(T &&value) : val(new T(std::move(value))) {}
+
+    /**
+     * Constructor for a filled node. The given raw pointer must be
+     * new-allocated.
+     */
+    explicit Maybe(T *value) : val(value) {}
 
     /**
      * Sets the value to a copy of the object pointed to, or clears it if null.
@@ -483,6 +281,27 @@ public:
 template <class T>
 class One : public Maybe<T> {
 public:
+
+    /**
+     * Constructor for an empty (invalid) node.
+     */
+    One() : Maybe<T>() {}
+
+    /**
+     * Constructor for a filled node (copy).
+     */
+    explicit One(const T &value) : Maybe<T>(value) {}
+
+    /**
+     * Constructor for a filled node (move).
+     */
+    explicit One(T &&value) : Maybe<T>(std::move(value)) {}
+
+    /**
+     * Constructor for a filled node. The given raw pointer must be
+     * new-allocated.
+     */
+    explicit One(T *value) : Maybe<T>(value) {}
 
     /**
      * Returns whether this object is complete/fully defined.

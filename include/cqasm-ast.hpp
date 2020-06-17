@@ -16,9 +16,9 @@
  * behavior.
  *
  *  - `Visitor` defaults to a fallback function for node types with no
- *    specific implementation. This would function would usually just be
- *    no-op or throw an appropriate exception, based on what the visitor
- *    is supposed to do.
+ *    specific implementation. This function would usually just be no-op or
+ *    throw an appropriate exception, based on what the visitor is supposed to
+ *    do.
  *  - `RecursiveVisitor` defaults to traversing the tree depth-first for
  *    non-leaf nodes. Leaf nodes still default to a fallback function. This
  *    is useful when the goal is to flatten the recursive structure in some

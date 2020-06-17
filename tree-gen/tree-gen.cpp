@@ -91,25 +91,34 @@ static void generate_typecast_function(
     NodeType &into,
     bool allowed
 ) {
-    std::string doc = "Interprets this node to a node of type "
-                    + into.title_case_name
-                    + ". Returns null if it has the wrong type.";
-    format_doc(header, doc, "    ");
-    header << "    ";
-    if (!allowed) header << "virtual ";
-    header << into.title_case_name << " *";
-    header << "as_" << into.snake_case_name << "()";
-    if (allowed) header << " override";
-    header << ";" << std::endl << std::endl;
-    format_doc(source, doc);
-    source << into.title_case_name << " *";
-    source << clsname << "::as_" << into.snake_case_name << "() {" << std::endl;
-    if (allowed) {
-        source << "    return static_cast<" << into.title_case_name << "*>(this);" << std::endl;
-    } else {
-        source << "    return nullptr;" << std::endl;
+    for (int constant = 0; constant < 2; constant++) {
+        std::string doc = "Interprets this node to a node of type "
+                          + into.title_case_name
+                          + ". Returns null if it has the wrong type.";
+        format_doc(header, doc, "    ");
+        header << "    ";
+        if (!allowed) header << "virtual ";
+        if (constant) header << "const ";
+        header << into.title_case_name << " *";
+        header << "as_" << into.snake_case_name << "()";
+        if (constant) header << " const";
+        if (allowed) header << " override";
+        header << ";" << std::endl << std::endl;
+        format_doc(source, doc);
+        if (constant) source << "const ";
+        source << into.title_case_name << " *";
+        source << clsname << "::as_" << into.snake_case_name << "()";
+        if (constant) source << " const";
+        source << " {" << std::endl;
+        if (allowed) {
+            source << "    return dynamic_cast<";
+            if (constant) source << "const ";
+            source << into.title_case_name << "*>(this);" << std::endl;
+        } else {
+            source << "    return nullptr;" << std::endl;
+        }
+        source << "}" << std::endl << std::endl;
     }
-    source << "}" << std::endl << std::endl;
 }
 
 /**
@@ -163,6 +172,7 @@ static void generate_node_class(
     std::ofstream &source,
     NodeType &node
 ) {
+    const auto all_children = node.all_children();
 
     // Print class header.
     if (!node.doc.empty()) {
@@ -193,6 +203,77 @@ static void generate_node_class(
         header << child.name << ";" << std::endl << std::endl;
     }
 
+    // Print constructors.
+    format_doc(header, "Default constructor.", "    ");
+    header << "    " << node.title_case_name << "() = default;" << std::endl << std::endl;
+    if (!all_children.empty()) {
+        format_doc(header, "Constructor with values.", "    ");
+        header << "    " << node.title_case_name << "(";
+        bool first = true;
+        for (auto &child : all_children) {
+            if (first) {
+                first = false;
+            } else {
+                header << ", ";
+            }
+            header << "const ";
+            switch (child.type) {
+                case Maybe: header << "Maybe<" << child.node_type->title_case_name << "> "; break;
+                case One:   header << "One<"   << child.node_type->title_case_name << "> "; break;
+                case Any:   header << "Any<"   << child.node_type->title_case_name << "> "; break;
+                case Many:  header << "Many<"  << child.node_type->title_case_name << "> "; break;
+                case Prim:  header << child.prim_type << " "; break;
+            }
+            header << "&" << child.name;
+        }
+        header << ");" << std::endl << std::endl;
+
+        format_doc(source, "Constructor with values.", "");
+        source << node.title_case_name << "::" << node.title_case_name << "(";
+        first = true;
+        for (auto &child : all_children) {
+            if (first) {
+                first = false;
+            } else {
+                source << ", ";
+            }
+            source << "const ";
+            switch (child.type) {
+                case Maybe: source << "Maybe<" << child.node_type->title_case_name << "> "; break;
+                case One:   source << "One<"   << child.node_type->title_case_name << "> "; break;
+                case Any:   source << "Any<"   << child.node_type->title_case_name << "> "; break;
+                case Many:  source << "Many<"  << child.node_type->title_case_name << "> "; break;
+                case Prim:  source << child.prim_type << " "; break;
+            }
+            source << "&" << child.name;
+        }
+        source << ")" << std::endl << "    : ";
+        first = true;
+        if (node.parent) {
+            source << node.parent->title_case_name << "(";
+            first = true;
+            for (auto &child : node.parent->all_children()) {
+                if (first) {
+                    first = false;
+                } else {
+                    source << ", ";
+                }
+                source << child.name;
+            }
+            source << ")";
+            first = false;
+        }
+        for (auto &child : node.children) {
+            if (first) {
+                first = false;
+            } else {
+                source << ", ";
+            }
+            source << child.name << "(" << child.name << ")";
+        }
+        source << std::endl << "{}" << std::endl << std::endl;
+    }
+
     // Print is_complete function.
     if (node.derived.empty()) {
         auto doc = "Returns whether this `" + node.title_case_name + "` is complete/fully defined.";
@@ -204,7 +285,7 @@ static void generate_node_class(
         if (node.is_error_marker) {
             source << "    return false;" << std::endl;
         } else {
-            for (auto &child : node.all_children()) {
+            for (auto &child : all_children) {
                 switch (child.type) {
                     case Maybe:
                     case One:
@@ -242,10 +323,9 @@ static void generate_node_class(
         source << "bool " << node.title_case_name;
         source << "::operator==(const Node& rhs) const {" << std::endl;
         source << "    if (rhs.type() != NodeType::" << node.title_case_name << ") return false;" << std::endl;
-        auto children = node.all_children();
-        if (!children.empty()) {
-            source << "    auto rhsc = static_cast<const " << node.title_case_name << "&>(rhs);" << std::endl;
-            for (auto &child : children) {
+        if (!all_children.empty()) {
+            source << "    auto rhsc = dynamic_cast<const " << node.title_case_name << "&>(rhs);" << std::endl;
+            for (auto &child : all_children) {
                 source << "    if (this->" << child.name << " != rhsc." << child.name << ") return false;" << std::endl;
             }
         }
