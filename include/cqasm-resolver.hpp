@@ -68,7 +68,7 @@ public:
      * Resolves a mapping. Throws NameResolutionFailure if no mapping by the
      * given name exists.
      */
-    values::Value call(const std::string &name) const;
+    values::Value resolve(const std::string &name) const;
 
 };
 
@@ -92,6 +92,11 @@ private:
 public:
 
     FunctionTable();
+    ~FunctionTable();
+    FunctionTable(const FunctionTable& t);
+    FunctionTable(FunctionTable&& t);
+    FunctionTable& operator=(const FunctionTable& t);
+    FunctionTable& operator=(FunctionTable&& t);
 
     /**
      * Registers a function. The name should be lowercase; matching will be done
@@ -122,6 +127,11 @@ private:
 public:
 
     ErrorModelTable();
+    ~ErrorModelTable();
+    ErrorModelTable(const ErrorModelTable& t);
+    ErrorModelTable(ErrorModelTable&& t);
+    ErrorModelTable& operator=(const ErrorModelTable& t);
+    ErrorModelTable& operator=(ErrorModelTable&& t);
 
     /**
      * Registers an error model.
@@ -148,6 +158,11 @@ private:
 public:
 
     InstructionTable();
+    ~InstructionTable();
+    InstructionTable(const InstructionTable& t);
+    InstructionTable(InstructionTable&& t);
+    InstructionTable& operator=(const InstructionTable& t);
+    InstructionTable& operator=(InstructionTable&& t);
 
     /**
      * Registers an instruction type.

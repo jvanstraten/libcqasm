@@ -31,12 +31,12 @@ void MappingTable::add(const std::string &name, const Value &value) {
  * Resolves a mapping. Throws NameResolutionFailure if no mapping by the
  * given name exists.
  */
-Value MappingTable::call(const std::string &name) const {
+Value MappingTable::resolve(const std::string &name) const {
     auto entry = table.find(lowercase(name));
     if (entry == table.end()) {
         throw NameResolutionFailure();
     } else {
-        return entry->second;
+        return Value(entry->second->clone());
     }
 }
 
@@ -187,6 +187,15 @@ public:
 };
 
 FunctionTable::FunctionTable() : resolver(new OverloadedNameResolver<FunctionImpl>()) {}
+FunctionTable::~FunctionTable() {}
+FunctionTable::FunctionTable(const FunctionTable& t) : resolver(new OverloadedNameResolver<FunctionImpl>(*t.resolver)) {}
+FunctionTable::FunctionTable(FunctionTable&& t) : resolver(std::move(t.resolver)) {}
+FunctionTable& FunctionTable::operator=(const FunctionTable& t) {
+    resolver = std::unique_ptr<OverloadedNameResolver<FunctionImpl>>(new OverloadedNameResolver<FunctionImpl>(*t.resolver));
+}
+FunctionTable& FunctionTable::operator=(FunctionTable&& t) {
+    resolver = std::move(t.resolver);
+}
 
 /**
  * Registers a function. The name should be lowercase; matching will be done
@@ -218,6 +227,15 @@ Value FunctionTable::call(const std::string &name, const Values &args) const {
 }
 
 ErrorModelTable::ErrorModelTable() : resolver(new OverloadedNameResolver<error_model::ErrorModel>()) {}
+ErrorModelTable::~ErrorModelTable() {}
+ErrorModelTable::ErrorModelTable(const ErrorModelTable& t) : resolver(new OverloadedNameResolver<error_model::ErrorModel>(*t.resolver)) {}
+ErrorModelTable::ErrorModelTable(ErrorModelTable&& t) : resolver(std::move(t.resolver)) {}
+ErrorModelTable& ErrorModelTable::operator=(const ErrorModelTable& t) {
+    resolver = std::unique_ptr<OverloadedNameResolver<error_model::ErrorModel>>(new OverloadedNameResolver<error_model::ErrorModel>(*t.resolver));
+}
+ErrorModelTable& ErrorModelTable::operator=(ErrorModelTable&& t) {
+    resolver = std::move(t.resolver);
+}
 
 /**
  * Registers an error model.
@@ -243,6 +261,15 @@ semantic::ErrorModel ErrorModelTable::resolve(const std::string &name, const Val
 }
 
 InstructionTable::InstructionTable() : resolver(new OverloadedNameResolver<instruction::Instruction>()) {}
+InstructionTable::~InstructionTable() {}
+InstructionTable::InstructionTable(const InstructionTable& t) : resolver(new OverloadedNameResolver<instruction::Instruction>(*t.resolver)) {}
+InstructionTable::InstructionTable(InstructionTable&& t) : resolver(std::move(t.resolver)) {}
+InstructionTable& InstructionTable::operator=(const InstructionTable& t) {
+    resolver = std::unique_ptr<OverloadedNameResolver<instruction::Instruction>>(new OverloadedNameResolver<instruction::Instruction>(*t.resolver));
+}
+InstructionTable& InstructionTable::operator=(InstructionTable&& t) {
+    resolver = std::move(t.resolver);
+}
 
 /**
  * Registers an instruction type.

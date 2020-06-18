@@ -6,6 +6,7 @@
 #include <cstdio>
 
 namespace cqasm {
+namespace analyzer {
 
 /**
  * Analysis result class.
@@ -16,7 +17,7 @@ public:
     /**
      * Root node of the semantic tree, if analysis was successful.
      */
-    ast::One<semantic::Root> root;
+    ast::One<semantic::Program> root;
 
     /**
      * List of accumulated errors. Analysis was successful if and only if
@@ -84,13 +85,21 @@ private:
      */
     bool resolve_error_model;
 
+    /**
+     * Parses the given expression into a value using the given mapping scope.
+     */
+    values::Value parse_expression(
+        const ast::Expression &expression,
+        const resolver::MappingTable &scope) const;
+
 public:
 
     /**
-     * Analyzes the given AST.
+     * Analyzes the given program AST node.
      */
-    AnalysisResult analyze(const ast::Root &ast_root) const;
+    AnalysisResult analyze(const ast::Program &program) const;
 
 };
 
+} // namespace analyzer
 } // namespace cqasm

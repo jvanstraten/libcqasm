@@ -111,29 +111,19 @@ version {
 
 }
 
-# Any root node for the analyzed program.
-root {
+# A complete program.
+program {
 
-    # A complete program.
-    program {
+    # File version.
+    version: One<version>;
 
-        # File version.
-        version: One<version>;
+    # The required qubit register size.
+    num_qubits: cqasm::primitives::Int;
 
-        # The required qubit register size.
-        num_qubits: cqasm::primitives::Int;
+    # Error model information.
+    error_model: Maybe<error_model>;
 
-        # Error model information.
-        error_model: Maybe<error_model>;
-
-        # The list of subcircuit.
-        kernels: Any<subcircuit>;
-
-    }
-
-    # Placeholder for a program with a parse error.
-    erroneous_program {
-        error;
-    }
+    # The list of subcircuit.
+    kernels: Any<subcircuit>;
 
 }

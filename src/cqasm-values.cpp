@@ -142,8 +142,7 @@ Value promote(const Value &value, const types::Type &type) {
         retval->copy_annotation<parser::SourceLocation>(*value);
     }
 
-    // Can't promote.
-    return Value();
+    return retval;
 }
 
 } // namespace values
