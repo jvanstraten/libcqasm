@@ -63,8 +63,8 @@ Value promote(const Value &value, const types::Type &type) {
             if (value->type() == ValueEnum::ConstRealMatrix) {
                 auto mat_value = value->as_const_real_matrix();
                 // Match matrix size. Negative sizes in the type mean unconstrained.
-                if (mat_value->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
-                    if (mat_value->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
+                if ((ssize_t)mat_value->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
+                    if ((ssize_t)mat_value->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
                         return(ConstRealMatrix, *mat_value);
                     }
                 }
@@ -77,16 +77,16 @@ Value promote(const Value &value, const types::Type &type) {
             if (value->type() == ValueEnum::ConstComplexMatrix) {
                 const values::ConstComplexMatrix *mat_value = value->as_const_complex_matrix();
                 // Match matrix size. Negative sizes in the type mean unconstrained.
-                if (mat_value->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
-                    if (mat_value->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
+                if ((ssize_t)mat_value->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
+                    if ((ssize_t)mat_value->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
                         return(ConstComplexMatrix, *mat_value);
                     }
                 }
             } else if (value->type() == ValueEnum::ConstRealMatrix) {
                 auto mat_value = value->as_const_real_matrix();
                 // Match matrix size. Negative sizes in the type mean unconstrained.
-                if (mat_value->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
-                    if (mat_value->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
+                if ((ssize_t)mat_value->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
+                    if ((ssize_t)mat_value->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
                         // Convert double to complex.
                         const size_t rows = mat_value->value.size_rows();
                         const size_t cols = mat_value->value.size_cols();

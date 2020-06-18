@@ -63,7 +63,7 @@ public:
      */
     Anything() :
         data(nullptr),
-        destructor([](void *data){}),
+        destructor([](void*){}),
         type(std::type_index(typeid(nullptr)))
     {}
 

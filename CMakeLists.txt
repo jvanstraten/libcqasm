@@ -25,6 +25,9 @@ else()
     set(CMAKE_CXX_EXTENSIONS ON)
 endif()
 
+# Enable all warnings.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+
 # Require flex/bison; if not installed, this will try to build from source.
 set(FLEX_VERSION_REQUIRED 2.6.1)
 set(BISON_VERSION_REQUIRED 3.0)

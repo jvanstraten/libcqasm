@@ -345,6 +345,7 @@ Root            : Program                                                       
 %%
 
 void yyerror(YYLTYPE* yyllocp, yyscan_t unused, cqasm::ParseHelper &helper, const char* msg) {
+    (void)unused;
     std::ostringstream sb;
     sb << helper.result.filename
        << ":"  << yyllocp->first_line

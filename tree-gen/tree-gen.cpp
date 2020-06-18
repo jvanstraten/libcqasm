@@ -490,6 +490,7 @@ static void generate_dumper_class(
     header << "    void visit_node(Node &node) override;" << std::endl;
     format_doc(source, "Dumps a `Node`.");
     source << "void Dumper::visit_node(Node &node) {" << std::endl;
+    source << "    (void)node;" << std::endl;
     source << "    write_indent();" << std::endl;
     source << "    out << \"!Node()\" << std::endl;" << std::endl;
     source << "}" << std::endl << std::endl;

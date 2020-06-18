@@ -356,7 +356,7 @@ public:
         if (!ob) {
             return;
         }
-        if (pos < 0 || pos >= size()) {
+        if (pos < 0 || (size_t)pos >= size()) {
             this->vec.emplace_back(std::make_shared(*ob));
         } else {
             this->vec.emplace(this->vec.cbegin() + pos, std::make_shared(*ob));
@@ -367,7 +367,7 @@ public:
      * Adds the given value by copy.
      */
     void add(const T &ob, ssize_t pos=-1) {
-        if (pos < 0 || pos >= size()) {
+        if (pos < 0 || (size_t)pos >= size()) {
             this->vec.emplace_back(std::make_shared(ob));
         } else {
             this->vec.emplace(this->vec.cbegin() + pos, std::make_shared(ob));
@@ -378,7 +378,7 @@ public:
      * Adds the given value by move.
      */
     void add(T &&ob, ssize_t pos=-1) {
-        if (pos < 0 || pos >= size()) {
+        if (pos < 0 || (size_t)pos >= size()) {
             this->vec.emplace_back(std::make_shared(std::move(ob)));
         } else {
             this->vec.emplace(this->vec.cbegin() + pos, std::make_shared(std::move(ob)));
@@ -393,7 +393,7 @@ public:
         if (!ob) {
             return;
         }
-        if (pos < 0 || pos >= size()) {
+        if (pos < 0 || (size_t)pos >= size()) {
             this->vec.emplace_back(ob);
         } else {
             this->vec.emplace(this->vec.cbegin() + pos, ob);

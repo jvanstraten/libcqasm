@@ -35,4 +35,5 @@ bool ErrorModel::operator==(const ErrorModel& rhs) const {
  */
 std::ostream& operator<<(std::ostream& os, const ::cqasm::error_model::ErrorModel& model) {
     os << model.name << model.param_types;
+    return os;
 }

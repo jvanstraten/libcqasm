@@ -47,4 +47,5 @@ bool Instruction::operator==(const Instruction& rhs) const {
  */
 std::ostream& operator<<(std::ostream& os, const ::cqasm::instruction::Instruction& model) {
     os << model.name << model.param_types;
+    return os;
 }
