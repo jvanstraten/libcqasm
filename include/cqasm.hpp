@@ -1,7 +1,4 @@
-#ifndef _CQASM_HPP_INCLUDED_
-#define _CQASM_HPP_INCLUDED_
+#pragma once
 
 #include "cqasm-ast.hpp"
 #include "cqasm-analyzer.hpp"
-
-#endif

@@ -13,8 +13,7 @@
  * information. Any kind of metadata goes.
  */
 
-#ifndef _CQASM_ANOTATABLE_HPP_INCLUDED_
-#define _CQASM_ANOTATABLE_HPP_INCLUDED_
+#pragma once
 
 #include <memory>
 #include <vector>
@@ -260,5 +259,3 @@ public:
 
 } // namespace annotatable
 } // namespace cqasm
-
-#endif

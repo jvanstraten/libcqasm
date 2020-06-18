@@ -65,6 +65,22 @@ generate_tree(
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
 )
 
+# Generate the type tree classes.
+generate_tree(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-types.tree"
+    "${CMAKE_CURRENT_BINARY_DIR}/include/cqasm-types-gen.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-types-gen.cpp"
+)
+
+# Generate the semantic value classes. Values can be either known at
+# compile-time or only at runtime, but their type is resolved to one of the
+# type tree nodes at compile-time.
+generate_tree(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-values.tree"
+    "${CMAKE_CURRENT_BINARY_DIR}/include/cqasm-values-gen.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-values-gen.cpp"
+)
+
 # Generate the semantic tree classes.
 generate_tree(
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-semantic.tree"
@@ -77,13 +93,17 @@ add_library(
     cqasm
     ${BISON_cqasm-parser_OUTPUTS}
     ${FLEX_cqasm-lexer_OUTPUTS}
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-types-gen.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-values-gen.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-semantic-gen.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-primitives.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-ast.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
-    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-semantic-gen.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-analyzer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-types.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-values.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-resolver.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-analyzer.cpp"
 )
 
 # The src directory and binary directory (for generated header files) are

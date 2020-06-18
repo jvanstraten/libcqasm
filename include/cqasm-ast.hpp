@@ -60,8 +60,7 @@
  * manually would be extremely tedious and error-prone.
  */
 
-#ifndef _CQASM_AST_HPP_INCLUDED_
-#define _CQASM_AST_HPP_INCLUDED_
+#pragma once
 
 #include "cqasm-ast-gen.hpp"
 #include <iostream>
@@ -93,5 +92,3 @@ public:
 
 } // namespace ast
 } // namespace cqasm
-
-#endif

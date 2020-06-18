@@ -1,5 +1,4 @@
-#ifndef _CQASM_PRIMITIVES_HPP_INCLUDED_
-#define _CQASM_PRIMITIVES_HPP_INCLUDED_
+#pragma once
 
 #include <string>
 #include <cstdint>
@@ -177,5 +176,3 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::primitives::Matrix<T>&
  * Stream << overload for version nodes.
  */
 std::ostream& operator<<(std::ostream& os, const ::cqasm::primitives::Version& object);
-
-#endif

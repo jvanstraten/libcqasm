@@ -1,5 +1,4 @@
-#ifndef _CQASM_ANALYZER_HPP_INCLUDED_
-#define _CQASM_ANALYZER_HPP_INCLUDED_
+#pragma once
 
 #include "cqasm-ast.hpp"
 #include <cstdio>
@@ -147,5 +146,3 @@ public:
  * Stream << overload for source location objects.
  */
 std::ostream& operator<<(std::ostream& os, const cqasm::SourceLocation& object);
-
-#endif

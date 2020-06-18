@@ -8,6 +8,7 @@ tree_namespace cqasm::tree
 
 # Include primitive types.
 include "cqasm-primitives.hpp"
+include "cqasm-values.hpp"
 
 # Include SourceLocation annotation object for the debug dump generator.
 src_include "cqasm-analyzer.hpp"
@@ -17,182 +18,20 @@ location cqasm::SourceLocation
 namespace cqasm
 namespace semantic
 
-# Represents a cQASM type.
-type {
-
-    # Type of one or more qubit references.
-    qubit_type {}
-
-    # Type of a boolean/bit.
-    bool_type {}
-
-    # Type of an axis (x, y, or z).
-    axis_type {}
-
-    # Type of an integer (signed 64-bit).
-    int_type {}
-
-    # Type of a real number (IEEE double).
-    real_type {}
-
-    # Type of a complex number (2x IEEE double).
-    complex_type {}
-
-    # Type of a real matrix. Also used for one-dimensional arrays and vectors.
-    real_matrix_type {
-
-        # Number of rows. Negative indicates that the value is unconstrained.
-        # Must be one or more otherwise.
-        num_rows: cqasm::primitives::Int;
-
-        # Number of columns. Negative indicates that the value is
-        # unconstrained. Can be zero, unlike num_rows.
-        num_cols: cqasm::primitives::Int;
-
-    }
-
-    # Type of a complex matrix. Also used for one-dimensional arrays and
-    # vectors.
-    complex_matrix_type {
-
-        # Number of rows. Negative indicates that the value is unconstrained.
-        # Must be one or more otherwise.
-        num_rows: cqasm::primitives::Int;
-
-        # Number of columns. Negative indicates that the value is
-        # unconstrained. Can be zero, unlike num_rows.
-        num_cols: cqasm::primitives::Int;
-
-    }
-
-    # Type of an arbitrary string.
-    string_type {}
-
-    # Type of a JSON string.
-    json_type {}
-
-}
-
-# Represents a value, either in the form of a reference or a constant.
-value {
-
-    # Represents a constant value.
-    constant {
-
-        # Represents a value of type bool.
-        const_bool {
-
-            # The contained value.
-            value: cqasm::primitives::Bool;
-
-        }
-
-        # Represents an axis value (x, y, or z).
-        const_axis {
-
-            # The contained value.
-            value: cqasm::primitives::Axis;
-
-        }
-
-        # Represents a value of type int.
-        const_int {
-
-            # The contained value.
-            value: cqasm::primitives::Int;
-
-        }
-
-        # Represents a value of type real.
-        const_real {
-
-            # The contained value.
-            value: cqasm::primitives::Real;
-
-        }
-
-        # Represents a value of type complex.
-        const_complex {
-
-            # The contained value.
-            value: cqasm::primitives::Complex;
-
-        }
-
-        # Represents a value of type real_matrix.
-        const_real_matrix {
-
-            # The contained value.
-            value: cqasm::primitives::RMatrix;
-
-        }
-
-        # Represents a value of type complex_matrix.
-        const_complex_matrix {
-
-            # The contained value.
-            value: cqasm::primitives::CMatrix;
-
-        }
-
-        # Represents a value of type string.
-        const_string {
-
-            # The contained value.
-            value: cqasm::primitives::Str;
-
-        }
-
-        # Represents a value of type json.
-        const_json {
-
-            # The contained value.
-            value: cqasm::primitives::Str;
-
-        }
-
-    }
-
-    # Represents a reference to a value only known at runtime.
-    reference {
-
-        # Represents a qubit, or a set of qubits for single-gate-multiple-qubit
-        # notation. The indices must not repeat.
-        qubit_refs {
-
-            # Set of qubit indices referred to, starting at 0.
-            index: Many<const_int>;
-
-        }
-
-        # Represents a measurement bit, or a number of measurement bits for
-        # conditional gates with multiple conditions. When there are multiple,
-        # the conditions are all AND'ed together.
-        bit_refs {
-
-            # The qubit index that this is a measurement bit for, starting at 0.
-            index: Many<const_int>;
-
-        }
-
-    }
-
-}
-
 # Represents an annotation.
 annotation_data {
 
     # The interface this annotation is intended for. If a target doesn't
     # support an interface, it should silently ignore the annotation.
-    interface: One<const_string>;
+    interface: cqasm::primitives::Str;
 
     # The operation within the interface that this annotation is intended for.
     # If a supports the corresponding interface but not the operation, it
     # should throw an error.
-    operation: One<const_string>;
+    operation: cqasm::primitives::Str;
 
     # Any operands attached to the annotation.
-    operands: Any<value>;
+    operands: cqasm::values::Values;
 
 }
 
@@ -206,10 +45,10 @@ annotated {
     error_model {
 
         # Name as it appears in the cQASM file.
-        name: One<const_string>;
+        name: cqasm::primitives::Str;
 
         # Error model parameters.
-        parameters: Many<value>;
+        parameters: cqasm::values::Values;
 
     }
 
@@ -217,13 +56,14 @@ annotated {
     instruction {
 
         # Name as it appears in the cQASM file.
-        name: One<const_string>;
+        name: cqasm::primitives::Str;
 
-        # Optional condition (c- notation).
-        condition: Maybe<bit_refs>;
+        # Condition (c- notation). When there is no condition, this is a
+        # constant boolean set to true.
+        condition: cqasm::values::Value;
 
         # Operands for the instruction.
-        operands: Many<value>;
+        operands: cqasm::values::Values;
 
     }
 
@@ -241,11 +81,12 @@ annotated {
 
         # The name of the subcircuit. If the file doesn't start with a subcircuit
         # definition, this is empty for the first subcircuit.
-        name: Maybe<const_string>;
+        name: cqasm::primitives::Str;
 
         # An optional integer expression representing the number of
-        # iterations for this subcircuit.
-        iterations: Maybe<const_int>;
+        # iterations for this subcircuit. This is 1 when the iteration count is
+        # not specified.
+        iterations: cqasm::primitives::Int;
 
         # The instruction bundles contained by this subcircuit.
         bundles: Any<bundle>;
@@ -271,8 +112,8 @@ root {
         # File version.
         version: One<version>;
 
-        # Integer expression indicating the number of qubits.
-        num_qubits: One<const_int>;
+        # The required qubit register size.
+        num_qubits: cqasm::primitives::Int;
 
         # Error model information.
         error_model: Maybe<error_model>;

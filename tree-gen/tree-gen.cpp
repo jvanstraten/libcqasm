@@ -672,8 +672,7 @@ int main(
     );
 
     // Header for the header file.
-    header << "#ifndef _" << include_guard << "_INCLUDED_" << std::endl;
-    header << "#define _" << include_guard << "_INCLUDED_" << std::endl;
+    header << "#pragma once" << std::endl;
     header << std::endl;
     header << "#include <iostream>" << std::endl;
     for (auto &include : specification.includes) {
@@ -770,9 +769,6 @@ int main(
     source << "    const_cast<" << name_space << "::Node&>(object).dump(os);" << std::endl;
     source << "    return os;" << std::endl;
     source << "}" << std::endl << std::endl;
-
-    // Footer for the header file.
-    header << "#endif" << std::endl;
 
     return 0;
 }

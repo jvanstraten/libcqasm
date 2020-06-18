@@ -34,8 +34,7 @@
  * pattern is recommended. Refer to the `cqasm-ast.hpp` header for details.
  */
 
-#ifndef _CQASM_TREE_HPP_INCLUDED_
-#define _CQASM_TREE_HPP_INCLUDED_
+#pragma once
 
 #include <memory>
 #include <vector>
@@ -97,6 +96,11 @@ public:
      * new-allocated.
      */
     explicit Maybe(T *value) : val(value) {}
+
+    /**
+     * Constructor for an empty or filled node given an existing shared_ptr.
+     */
+    explicit Maybe(const std::shared_ptr<T> &value) : val(value) {}
 
     /**
      * Sets the value to a copy of the object pointed to, or clears it if null.
@@ -215,6 +219,13 @@ public:
     }
 
     /**
+     * Returns a copy of the contained shared_ptr.
+     */
+    std::shared_ptr<T> &get_ptr() {
+        return val;
+    }
+
+    /**
      * Mutable dereference operator, shorthand for `get()`.
      */
     T &operator*() {
@@ -254,6 +265,13 @@ public:
      */
     inline bool operator!=(const Maybe& rhs) const {
         return !(*this == rhs);
+    }
+
+    /**
+     * Boolean operator.
+     */
+    operator bool() const {
+        return val != nullptr;
     }
 
     /**
@@ -304,6 +322,11 @@ public:
     explicit One(T *value) : Maybe<T>(value) {}
 
     /**
+     * Constructor for an empty or filled node given an existing shared_ptr.
+     */
+    explicit One(const std::shared_ptr<T> &value) : Maybe<T>(value) {}
+
+    /**
      * Returns whether this object is complete/fully defined.
      */
     bool is_complete() const override {
@@ -322,7 +345,7 @@ protected:
     /**
      * The contained vector. The `shared_ptr`s are assumed to be non-null.
      */
-    std::vector<std::shared_ptr<T>> vec;
+    std::vector<One<T>> vec;
 
 public:
 
@@ -375,6 +398,13 @@ public:
         } else {
             this->vec.emplace(this->vec.cbegin() + pos, ob);
         }
+    }
+
+    /**
+     * Adds by means of a One or Maybe object. No operation when op is empty.
+     */
+    void add(Maybe<T> &ob, ssize_t pos=-1) {
+        add(ob.get_ptr(), pos);
     }
 
     /**
@@ -435,57 +465,59 @@ public:
      * Returns a mutable reference to the contained value at the given index.
      * Raises an `out_of_range` when the reference is empty.
      */
-    T &get(size_t index) {
+    One<T> &at(size_t index) {
         return vec.at(index);
     }
 
     /**
-     * Returns a mutable reference to the contained value at the given index.
-     * Raises an `out_of_range` when the reference is empty.
+     * Returns an immutable reference to the contained value at the given
+     * index. Raises an `out_of_range` when the reference is empty.
      */
-    const T &get(size_t index) const {
+    const One<T> &at(size_t index) const {
         return vec.at(index);
     }
 
     /**
-     * Shorthand for `get()`.
+     * Shorthand for `at()`. Unlike std::vector's operator[], this also checks
+     * bounds.
      */
-    T &operator[] (size_t index) {
-        return get(index);
+    One<T> &operator[] (size_t index) {
+        return at(index);
     }
 
     /**
-     * Shorthand for `get()`.
+     * Shorthand for `at()`. Unlike std::vector's operator[], this also checks
+     * bounds.
      */
-    const T &operator[] (size_t index) const {
-        return get(index);
+    const One<T> &operator[] (size_t index) const {
+        return at(index);
     }
 
     /**
      * `begin()` for for-each loops.
      */
-    typename std::vector<std::shared_ptr<T>>::iterator begin() {
+    typename std::vector<One<T>>::iterator begin() {
         return vec.begin();
     }
 
     /**
      * `begin()` for for-each loops.
      */
-    typename std::vector<std::shared_ptr<T>>::const_iterator begin() const {
+    typename std::vector<One<T>>::const_iterator begin() const {
         return vec.begin();
     }
 
     /**
      * `end()` for for-each loops.
      */
-    typename std::vector<std::shared_ptr<T>>::iterator end() {
+    typename std::vector<One<T>>::iterator end() {
         return vec.end();
     }
 
     /**
      * `end()` for for-each loops.
      */
-    typename std::vector<std::shared_ptr<T>>::const_iterator end() const {
+    typename std::vector<One<T>>::const_iterator end() const {
         return vec.end();
     }
 
@@ -547,5 +579,3 @@ public:
 
 } // namespace tree
 } // namespace cqasm
-
-#endif
