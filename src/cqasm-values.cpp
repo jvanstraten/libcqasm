@@ -155,6 +155,7 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::values::Value& value) 
     } else {
         os << value.get();
     }
+    return os;
 }
 
 /**
@@ -176,4 +177,5 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::values::Values& values
         }
     }
     os << "]";
+    return os;
 }

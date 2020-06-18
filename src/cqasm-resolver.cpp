@@ -191,76 +191,12 @@ Value FunctionTable::call(const std::string &name, const Values &args) const {
 
 }
 
-/**
- * Creates a new instruction/error model type with the given name and
- * (optionally) supported parameter list. The parameter list is described
- * with one character per parameter, as follows:
- *  - q = qubit
- *  - a = axis (x, y, or z)
- *  - b = bit/boolean
- *  - i = integer
- *  - r = real
- *  - c = complex
- *  - u = complex matrix of size 4^n, where n is the number of qubits in
- *        the parameter list
- *  - s = (quoted) string
- *  - j = json
- * For more control, you can leave it empty (or unspecified) and manipulate
- * param_types manually.
- */
-StatementType::StatementType(const std::string &name, const std::string &param_types) : name(name) {
-
-    // Count the number of qubits, in case we find a unitary parameter.
-    size_t num_qubits = 0;
-    for (auto c : param_types) {
-        if (c == 'q') {
-            num_qubits += 1;
-        }
-    }
-
-    // Now resolve the types.
-    for (auto c : param_types) {
-        switch (c) {
-            case 'q':
-                this->param_types.add_raw(new types::Qubit());
-                break;
-            case 'a':
-                this->param_types.add_raw(new types::Axis());
-                break;
-            case 'b':
-                this->param_types.add_raw(new types::Bool());
-                break;
-            case 'i':
-                this->param_types.add_raw(new types::Int());
-                break;
-            case 'r':
-                this->param_types.add_raw(new types::Real());
-                break;
-            case 'c':
-                this->param_types.add_raw(new types::Complex());
-                break;
-            case 'u':
-                this->param_types.add_raw(new types::ComplexMatrix(
-                    1ull << num_qubits, 1ull << num_qubits));
-                break;
-            case 's':
-                this->param_types.add_raw(new types::String());
-                break;
-            case 'j':
-                this->param_types.add_raw(new types::Json());
-                break;
-            default:
-                throw std::invalid_argument("unknown type code encountered");
-        }
-    }
-}
-
-ErrorModelTable::ErrorModelTable() : resolver(new OverloadedNameResolver<StatementType>()) {}
+ErrorModelTable::ErrorModelTable() : resolver(new OverloadedNameResolver<error_model::ErrorModel>()) {}
 
 /**
  * Registers an error model.
  */
-void ErrorModelTable::add(const StatementType &type) {
+void ErrorModelTable::add(const error_model::ErrorModel &type) {
     resolver->add_overload(type.name, type, type.param_types);
 }
 
@@ -270,52 +206,16 @@ void ErrorModelTable::add(const StatementType &type) {
  * exists for the given arguments, or otherwise returns the resolved error
  * model node.
  */
-semantic::ErrorModel ErrorModelTable::resolve(const std::string &name, const Values &args) const {
+error_model::ErrorModel ErrorModelTable::resolve(const std::string &name, const Values &args) const {
     // TODO
 }
 
-/**
- * Creates a new instruction type with the given name and (optionally)
- * supported parameter list. The parameter list is described with one
- * character per parameter, as follows:
- *  - q = qubit
- *  - a = axis (x, y, or z)
- *  - b = bit/boolean
- *  - i = integer
- *  - r = real
- *  - c = complex
- *  - u = complex matrix of size 4^n, where n is the number of qubits in
- *        the parameter list
- *  - s = (quoted) string
- *  - j = json
- * For more control, you can leave it empty (or unspecified) and manipulate
- * param_types manually.
- *
- * allow_conditional specifies whether the instruction can be made
- * conditional with c- notation. allow_parallel specifies whether it may
- * appear bundled with other instructions. allow_reused_qubits specifies
- * whether it is legal for the instruction to use a qubit more than once in
- * its parameter list.
- */
-InstructionType::InstructionType(
-    const std::string &name,
-    const std::string &param_types,
-    bool allow_conditional,
-    bool allow_parallel,
-    bool allow_reused_qubits
-) :
-    StatementType(name, param_types),
-    allow_conditional(allow_conditional),
-    allow_parallel(allow_parallel),
-    allow_reused_qubits(allow_reused_qubits)
-{};
-
-InstructionTable::InstructionTable() : resolver(new OverloadedNameResolver<InstructionType>()) {}
+InstructionTable::InstructionTable() : resolver(new OverloadedNameResolver<instruction::Instruction>()) {}
 
 /**
  * Registers an instruction type.
  */
-void InstructionTable::add(const InstructionType &type) {
+void InstructionTable::add(const instruction::Instruction &type) {
     resolver->add_overload(type.name, type, type.param_types);
 }
 
@@ -325,7 +225,7 @@ void InstructionTable::add(const InstructionType &type) {
  * exists for the given arguments, or otherwise returns the resolved
  * instruction node.
  */
-semantic::Instruction InstructionTable::resolve(const std::string &name, const Values &args) const {
+instruction::Instruction InstructionTable::resolve(const std::string &name, const Values &args) const {
     // TODO
 }
 

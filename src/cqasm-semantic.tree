@@ -9,6 +9,8 @@ tree_namespace cqasm::tree
 # Include primitive types.
 include "cqasm-primitives.hpp"
 include "cqasm-values.hpp"
+include "cqasm-error-model.hpp"
+include "cqasm-instruction.hpp"
 
 # Include SourceLocation annotation object for the debug dump generator.
 src_include "cqasm-analyzer.hpp"
@@ -44,6 +46,9 @@ annotated {
     # Error model information.
     error_model {
 
+        # Error model type as registered through the API.
+        model: cqasm::error_model::ErrorModel;
+
         # Name as it appears in the cQASM file.
         name: cqasm::primitives::Str;
 
@@ -54,6 +59,9 @@ annotated {
 
     # An instruction (a.k.a. gate).
     instruction {
+
+        # Instruction type as registered through the API.
+        instruction: cqasm::instruction::Instruction;
 
         # Name as it appears in the cQASM file.
         name: cqasm::primitives::Str;

@@ -2,8 +2,8 @@
 
 #include <functional>
 #include <algorithm>
-#include "cqasm-types.hpp"
-#include "cqasm-values.hpp"
+#include "cqasm-error-model.hpp"
+#include "cqasm-instruction.hpp"
 #include "cqasm-semantic.hpp"
 
 namespace cqasm {
@@ -71,57 +71,11 @@ public:
 };
 
 /**
- * Representation of an instruction (aka gate) or error model type.
- * InstructionTable and ErrorModelTable contain a map of these, used by libqasm
- * to match the instructions/error models it finds in the cQASM file with the
- * supported instruction/error model set.
- *
- * As a user of the instruction resolution functionality, you may want to add
- * your own data to the InstructionTypes that you register. For instance, a
- * simulator may want to attach the gate matrix. This can be done using
- * annotations. Refer to cqasm-annotatable.hpp for more info.
- */
-class StatementType : public annotatable::Annotatable {
-public:
-
-    /**
-     * The name of the instruction or error model. Note that names are matched
-     * case insensitively.
-     */
-    std::string name;
-
-    /**
-     * The vector of parameter types that this instruction/error model expects.
-     */
-    types::Types param_types;
-
-    /**
-     * Creates a new instruction/error model type with the given name and
-     * (optionally) supported parameter list. The parameter list is described
-     * with one character per parameter, as follows:
-     *  - q = qubit
-     *  - a = axis (x, y, or z)
-     *  - b = bit/boolean
-     *  - i = integer
-     *  - r = real
-     *  - c = complex
-     *  - u = complex matrix of size 4^n, where n is the number of qubits in
-     *        the parameter list
-     *  - s = (quoted) string
-     *  - j = json
-     * For more control, you can leave it empty (or unspecified) and manipulate
-     * param_types manually.
-     */
-    StatementType(const std::string &name, const std::string &param_types = "");
-
-};
-
-/**
  * Table of the supported instructions and their overloads.
  */
 class ErrorModelTable {
 private:
-    std::unique_ptr<OverloadedNameResolver<StatementType>> resolver;
+    std::unique_ptr<OverloadedNameResolver<error_model::ErrorModel>> resolver;
 public:
 
     ErrorModelTable();
@@ -129,7 +83,7 @@ public:
     /**
      * Registers an error model.
      */
-    void add(const StatementType &type);
+    void add(const error_model::ErrorModel &type);
 
     /**
      * Resolves an error model. Throws NameResolutionFailure if no error model
@@ -137,64 +91,7 @@ public:
      * exists for the given arguments, or otherwise returns the resolved error
      * model node.
      */
-    semantic::ErrorModel resolve(const std::string &name, const values::Values &args) const;
-
-};
-
-/**
- * Extension of StatementType for instructions (aka gates) specifically, with
- * a few extra parameters.
- */
-class InstructionType : public StatementType {
-
-    /**
-     * Whether this instruction supports conditional execution by means of the
-     * c- notation. This is normally true.
-     */
-    bool allow_conditional;
-
-    /**
-     * Whether this instruction can be used in a bundle. This is normally true.
-     */
-    bool allow_parallel;
-
-    /**
-     * Whether to allow usage of the same qubit in different arguments. This is
-     * normally false, as this makes no sense in QM, in which case libqasm will
-     * report an error to the user if a qubit is reused. Setting this to true
-     * just disables that check.
-     */
-    bool allow_reused_qubits;
-
-    /**
-     * Creates a new instruction type with the given name and (optionally)
-     * supported parameter list. The parameter list is described with one
-     * character per parameter, as follows:
-     *  - q = qubit
-     *  - a = axis (x, y, or z)
-     *  - b = bit/boolean
-     *  - i = integer
-     *  - r = real
-     *  - c = complex
-     *  - u = complex matrix of size 4^n, where n is the number of qubits in
-     *        the parameter list
-     *  - s = (quoted) string
-     *  - j = json
-     * For more control, you can leave it empty (or unspecified) and manipulate
-     * param_types manually.
-     *
-     * allow_conditional specifies whether the instruction can be made
-     * conditional with c- notation. allow_parallel specifies whether it may
-     * appear bundled with other instructions. allow_reused_qubits specifies
-     * whether it is legal for the instruction to use a qubit more than once in
-     * its parameter list.
-     */
-    InstructionType(
-        const std::string &name,
-        const std::string &param_types = "",
-        bool allow_conditional = true,
-        bool allow_parallel = true,
-        bool allow_reused_qubits = false);
+    error_model::ErrorModel resolve(const std::string &name, const values::Values &args) const;
 
 };
 
@@ -203,7 +100,7 @@ class InstructionType : public StatementType {
  */
 class InstructionTable {
 private:
-    std::unique_ptr<OverloadedNameResolver<InstructionType>> resolver;
+    std::unique_ptr<OverloadedNameResolver<instruction::Instruction>> resolver;
 public:
 
     InstructionTable();
@@ -211,7 +108,7 @@ public:
     /**
      * Registers an instruction type.
      */
-    void add(const InstructionType &type);
+    void add(const instruction::Instruction &type);
 
     /**
      * Resolves an instruction. Throws NameResolutionFailure if no instruction
@@ -219,7 +116,7 @@ public:
      * exists for the given arguments, or otherwise returns the resolved
      * instruction node.
      */
-    semantic::Instruction resolve(const std::string &name, const values::Values &args) const;
+    instruction::Instruction resolve(const std::string &name, const values::Values &args) const;
 
 };
 
