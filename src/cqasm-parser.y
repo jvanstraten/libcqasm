@@ -6,23 +6,23 @@
     #include <cstdio>
     #include <cstdint>
     #include "cqasm-ast.hpp"
-    #include "cqasm-analyzer.hpp"
+    #include "cqasm-parse-helper.hpp"
     using namespace cqasm::ast;
     typedef void* yyscan_t;
 }
 
 %code {
     int yylex(YYSTYPE* yylvalp, YYLTYPE* yyllocp, yyscan_t scanner);
-    void yyerror(YYLTYPE* yyllocp, yyscan_t scanner, cqasm::ParseHelper &helper, const char* msg);
+    void yyerror(YYLTYPE* yyllocp, yyscan_t scanner, cqasm::parser::ParseHelper &helper, const char* msg);
 }
 
 %code top {
-    #define ADD_SOURCE_LOCATION(v)                  \
-        v->set_annotation(cqasm::SourceLocation(    \
-            helper.result.filename,                 \
-            yyloc.first_line,                       \
-            yyloc.first_column,                     \
-            yyloc.last_line,                        \
+    #define ADD_SOURCE_LOCATION(v)                          \
+        v->set_annotation(cqasm::parser::SourceLocation(    \
+            helper.filename,                                \
+            yyloc.first_line,                               \
+            yyloc.first_column,                             \
+            yyloc.last_line,                                \
             yyloc.last_column))
 
 
@@ -30,22 +30,22 @@
         v = new T();            \
         ADD_SOURCE_LOCATION(v)
 
-    #define FROM(t, s)                                                                  \
-        t = s;                                                                          \
-        {                                                                               \
-            cqasm::SourceLocation *loc = t->get_annotation<cqasm::SourceLocation>();    \
-            if (!loc) {                                                                 \
-                ADD_SOURCE_LOCATION(t);                                                 \
-            } else {                                                                    \
-                loc->expand_to_include(yyloc.first_line, yyloc.first_column);           \
-                loc->expand_to_include(yyloc.last_line, yyloc.last_column);             \
-            }                                                                           \
+    #define FROM(t, s)                                                          \
+        t = s;                                                                  \
+        {                                                                       \
+            auto *loc = t->get_annotation_ptr<cqasm::parser::SourceLocation>(); \
+            if (!loc) {                                                         \
+                ADD_SOURCE_LOCATION(t);                                         \
+            } else {                                                            \
+                loc->expand_to_include(yyloc.first_line, yyloc.first_column);   \
+                loc->expand_to_include(yyloc.last_line, yyloc.last_column);     \
+            }                                                                   \
         }
 
 }
 
 %param { yyscan_t scanner }
-%parse-param { cqasm::ParseHelper &helper }
+%parse-param { cqasm::parser::ParseHelper &helper }
 
 /* YYSTYPE union */
 %union {
@@ -338,16 +338,16 @@ Program         : OptNewline VERSION Version Newline
                 ;
 
 /* Toplevel. */
-Root            : Program                                                       { helper.result.ast_root.set_raw($1); }
-                | error                                                         { helper.result.ast_root.set_raw(new ErroneousProgram()); }
+Root            : Program                                                       { helper.root.set_raw($1); }
+                | error                                                         { helper.root.set_raw(new ErroneousProgram()); }
                 ;
 
 %%
 
-void yyerror(YYLTYPE* yyllocp, yyscan_t unused, cqasm::ParseHelper &helper, const char* msg) {
+void yyerror(YYLTYPE* yyllocp, yyscan_t unused, cqasm::parser::ParseHelper &helper, const char* msg) {
     (void)unused;
     std::ostringstream sb;
-    sb << helper.result.filename
+    sb << helper.filename
        << ":"  << yyllocp->first_line
        << ":"  << yyllocp->first_column
        << ": " << msg;

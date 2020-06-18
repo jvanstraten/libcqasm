@@ -1,3 +1,4 @@
+#include <cqasm-parse-helper.hpp>
 #include "cqasm-values.hpp"
 
 namespace cqasm {
@@ -12,60 +13,59 @@ using ValueEnum = values::NodeType;
  * value by way of a smart pointer.
  */
 Value promote(const Value &value, const types::Type &type) {
-#define return(type, value) return Value(new values::type(value))
+    Value retval;
     switch (type->type()) {
         case TypeEnum::Qubit:
-            if (value->type() == ValueEnum::QubitRefs) {
-                return(QubitRefs, *value->as_qubit_refs());
+            if (auto qubit_refs = value->as_qubit_refs()) {
+                retval = tree::make<values::QubitRefs>(*qubit_refs);
             }
             break;
 
         case TypeEnum::Bool:
-            if (value->type() == ValueEnum::BitRefs) {
-                return(BitRefs, *value->as_bit_refs());
-            } else if (value->type() == ValueEnum::ConstBool) {
-                return(ConstBool, *value->as_const_bool());
+            if (auto bit_refs = value->as_bit_refs()) {
+                retval = tree::make<values::BitRefs>(*bit_refs);
+            } else if (auto const_bool = value->as_const_bool()) {
+                retval = tree::make<values::ConstBool>(const_bool->value);
             }
             break;
 
         case TypeEnum::Axis:
-            if (value->type() == ValueEnum::ConstAxis) {
-                return(ConstAxis, *value->as_const_axis());
+            if (auto const_axis = value->as_const_axis()) {
+                retval = tree::make<values::ConstAxis>(const_axis->value);
             }
             break;
 
         case TypeEnum::Int:
-            if (value->type() == ValueEnum::ConstInt) {
-                return(ConstInt, *value->as_const_int());
+            if (auto const_int = value->as_const_int()) {
+                retval = tree::make<values::ConstInt>(const_int->value);
             }
             break;
 
         case TypeEnum::Real:
-            if (value->type() == ValueEnum::ConstInt) {
-                return(ConstReal, values::ConstReal(value->as_const_int()->value));
-            } else if (value->type() == ValueEnum::ConstReal) {
-                return(ConstReal, *value->as_const_real());
+            if (auto const_int = value->as_const_int()) {
+                retval = tree::make<values::ConstReal>(const_int->value);
+            } else if (auto const_real = value->as_const_real()) {
+                retval = tree::make<values::ConstReal>(const_real->value);
             }
             break;
 
         case TypeEnum::Complex:
-            if (value->type() == ValueEnum::ConstInt) {
-                return(ConstComplex, values::ConstComplex(value->as_const_int()->value));
-            } else if (value->type() == ValueEnum::ConstReal) {
-                return(ConstComplex, values::ConstComplex(value->as_const_real()->value));
-            } else if (value->type() == ValueEnum::ConstComplex) {
-                return(ConstComplex, *value->as_const_complex());
+            if (auto const_int = value->as_const_int()) {
+                retval = tree::make<values::ConstComplex>(const_int->value);
+            } else if (auto const_real = value->as_const_real()) {
+                retval = tree::make<values::ConstComplex>(const_real->value);
+            } else if (auto const_complex = value->as_const_complex()) {
+                retval = tree::make<values::ConstComplex>(const_complex->value);
             }
             break;
 
         case TypeEnum::RealMatrix: {
             auto mat_type = type->as_real_matrix();
-            if (value->type() == ValueEnum::ConstRealMatrix) {
-                auto mat_value = value->as_const_real_matrix();
+            if (auto const_real_matrix = value->as_const_real_matrix()) {
                 // Match matrix size. Negative sizes in the type mean unconstrained.
-                if ((ssize_t)mat_value->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
-                    if ((ssize_t)mat_value->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
-                        return(ConstRealMatrix, *mat_value);
+                if ((ssize_t)const_real_matrix->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
+                    if ((ssize_t)const_real_matrix->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
+                        retval = tree::make<values::ConstRealMatrix>(const_real_matrix->value);
                     }
                 }
             }
@@ -74,29 +74,28 @@ Value promote(const Value &value, const types::Type &type) {
 
         case TypeEnum::ComplexMatrix: {
             auto mat_type = type->as_complex_matrix();
-            if (value->type() == ValueEnum::ConstComplexMatrix) {
-                const values::ConstComplexMatrix *mat_value = value->as_const_complex_matrix();
+            if (auto const_complex_matrix = value->as_const_complex_matrix()) {
                 // Match matrix size. Negative sizes in the type mean unconstrained.
-                if ((ssize_t)mat_value->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
-                    if ((ssize_t)mat_value->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
-                        return(ConstComplexMatrix, *mat_value);
+                if ((ssize_t)const_complex_matrix->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
+                    if ((ssize_t)const_complex_matrix->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
+                        retval = tree::make<values::ConstComplexMatrix>(const_complex_matrix->value);
                     }
                 }
-            } else if (value->type() == ValueEnum::ConstRealMatrix) {
-                auto mat_value = value->as_const_real_matrix();
+            } else if (auto const_real_matrix = value->as_const_real_matrix()) {
                 // Match matrix size. Negative sizes in the type mean unconstrained.
-                if ((ssize_t)mat_value->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
-                    if ((ssize_t)mat_value->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
+                if ((ssize_t)const_real_matrix->value.size_rows() == mat_type->num_rows || mat_type->num_rows < 0) {
+                    if ((ssize_t)const_real_matrix->value.size_cols() == mat_type->num_cols || mat_type->num_cols < 0) {
                         // Convert double to complex.
-                        const size_t rows = mat_value->value.size_rows();
-                        const size_t cols = mat_value->value.size_cols();
+                        const size_t rows = const_real_matrix->value.size_rows();
+                        const size_t cols = const_real_matrix->value.size_cols();
                         cqasm::primitives::CMatrix complex_mat_value(rows, cols);
                         for (size_t row = 1; row <= rows; row++) {
                             for (size_t col = 1; col <= cols; col++) {
-                                complex_mat_value.at(row, col) = mat_value->value.at(row, col);
+                                complex_mat_value.at(row, col) = const_real_matrix->value.at(row, col);
                             }
                         }
-                        return(ConstComplexMatrix, complex_mat_value);
+                        retval = tree::make<values::ConstComplexMatrix>(complex_mat_value);
+                        break;
                     }
                 }
                 // NOTE: DEPRECATED BEHAVIOR, FOR BACKWARDS COMPATIBILITY ONLY
@@ -108,17 +107,17 @@ Value promote(const Value &value, const types::Type &type) {
                 if (mat_type->num_rows == mat_type->num_cols && mat_type->num_rows > 0) {
                     const size_t size = mat_type->num_rows;
                     const size_t num_elements = 2ull << (2 * size);
-                    if (mat_value->value.size_rows() == 1 && mat_value->value.size_cols() == num_elements) {
+                    if (const_real_matrix->value.size_rows() == 1 && const_real_matrix->value.size_cols() == num_elements) {
                         cqasm::primitives::CMatrix complex_mat_value(size, size);
                         size_t index = 0;
                         for (size_t row = 1; row <= size; row++) {
                             for (size_t col = 1; col <= size; col++) {
-                                double re = mat_value->value.at(1, index++);
-                                double im = mat_value->value.at(1, index++);
+                                double re = const_real_matrix->value.at(1, index++);
+                                double im = const_real_matrix->value.at(1, index++);
                                 complex_mat_value.at(row, col) = std::complex<double>(re, im);
                             }
                         }
-                        return(ConstComplexMatrix, complex_mat_value);
+                        retval = tree::make<values::ConstComplexMatrix>(complex_mat_value);
                     }
                 }
             }
@@ -126,18 +125,22 @@ Value promote(const Value &value, const types::Type &type) {
         }
 
         case TypeEnum::String:
-            if (value->type() == ValueEnum::ConstString) {
-                return(ConstString, *value->as_const_string());
+            if (auto const_string = value->as_const_string()) {
+                retval = tree::make<values::ConstString>(const_string->value);
             }
             break;
 
         case TypeEnum::Json:
-            if (value->type() == ValueEnum::ConstJson) {
-                return(ConstJson, *value->as_const_json());
+            if (auto const_json = value->as_const_json()) {
+                retval = tree::make<values::ConstJson>(const_json->value);
             }
             break;
     }
-#undef return
+
+    // Copy source location annotations into the new object.
+    if (retval) {
+        retval->copy_annotation<parser::SourceLocation>(*value);
+    }
 
     // Can't promote.
     return Value();
@@ -153,7 +156,7 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::values::Value& value) 
     if (value.empty()) {
         os << "NULL";
     } else {
-        os << value.get();
+        os << *value;
     }
     return os;
 }

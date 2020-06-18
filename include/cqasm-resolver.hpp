@@ -29,6 +29,28 @@ public:
     }
 };
 
+/**
+ * Exception for when an instruction that cannot be used conditionally is used
+ * conditionally.
+ */
+class ConditionalExecutionNotSupported : std::exception {
+public:
+    const char *what() const noexcept override {
+        return "conditional execution is not supported for this instruction";
+    }
+};
+
+/**
+ * Exception for when an instruction that cannot be used conditionally is used
+ * conditionally.
+ */
+class QubitsNotUnique : std::exception {
+public:
+    const char *what() const noexcept override {
+        return "conditional execution is not supported for this instruction";
+    }
+};
+
 // Forward declaration for the name resolver template class. This class is
 // defined entirely in the C++ file to cut back on compile time.
 template <class T>
@@ -89,9 +111,10 @@ public:
      * Resolves an error model. Throws NameResolutionFailure if no error model
      * by the given name exists, OverloadResolutionFailure if no overload
      * exists for the given arguments, or otherwise returns the resolved error
-     * model node.
+     * model node. Annotation data and line number information still needs to
+     * be set by the caller.
      */
-    error_model::ErrorModel resolve(const std::string &name, const values::Values &args) const;
+    semantic::ErrorModel resolve(const std::string &name, const values::Values &args) const;
 
 };
 
@@ -114,9 +137,13 @@ public:
      * Resolves an instruction. Throws NameResolutionFailure if no instruction
      * by the given name exists, OverloadResolutionFailure if no overload
      * exists for the given arguments, or otherwise returns the resolved
-     * instruction node.
+     * instruction node. Annotation data and line number information still
+     * needs to be set by the caller.
      */
-    instruction::Instruction resolve(const std::string &name, const values::Values &args) const;
+    tree::Maybe<semantic::Instruction> resolve(
+        const std::string &name,
+        const values::Value &condition,
+        const values::Values &args) const;
 
 };
 

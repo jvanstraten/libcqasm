@@ -511,8 +511,8 @@ static void generate_dumper_class(
         source << "    }" << std::endl;
         source << "    out << \"" << node->title_case_name << "(\";" << std::endl;
         if (!source_location.empty()) {
-            source << "    if (node.has_annotation<" << source_location << ">()) {" << std::endl;
-            source << "        out << \" # \" << *node.get_annotation<" << source_location << ">();" << std::endl;
+            source << "    if (auto loc = node.get_annotation_ptr<" << source_location << ">()) {" << std::endl;
+            source << "        out << \" # \" << *loc;" << std::endl;
             source << "    }" << std::endl;
         }
         source << "    out << std::endl;" << std::endl;

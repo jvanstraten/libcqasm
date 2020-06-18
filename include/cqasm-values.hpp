@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cqasm-ast.hpp"
 #include "cqasm-values-gen.hpp"
 #include "cqasm-types.hpp"
 

@@ -226,7 +226,7 @@ public:
      * held by this object, or `nullptr` if there is no such annotation.
      */
     template <typename T>
-    T *get_annotation() {
+    T *get_annotation_ptr() {
         try {
             return annotations.at(std::type_index(typeid(T)))->get_mut<T>();
         } catch (const std::out_of_range&) {
@@ -239,11 +239,37 @@ public:
      * held by this object, or `nullptr` if there is no such annotation.
      */
     template <typename T>
-    const T *get_annotation() const {
+    const T *get_annotation_ptr() const {
         try {
             return annotations.at(std::type_index(typeid(T)))->get_const<T>();
         } catch (const std::out_of_range&) {
             return nullptr;
+        }
+    }
+
+    /**
+     * Returns a mutable pointer to the annotation object of the given type
+     * held by this object, or `nullptr` if there is no such annotation.
+     */
+    template <typename T>
+    T &get_annotation() {
+        if (auto annotation = get_annotation_ptr<T>()) {
+            return *annotation;
+        } else {
+            throw std::runtime_error("object does not have an annotation of this type");
+        }
+    }
+
+    /**
+     * Returns an immutable pointer to the annotation object of the given type
+     * held by this object, or `nullptr` if there is no such annotation.
+     */
+    template <typename T>
+    const T &get_annotation() const {
+        if (auto annotation = get_annotation_ptr<T>()) {
+            return *annotation;
+        } else {
+            throw std::runtime_error("object does not have an annotation of this type");
         }
     }
 
@@ -253,6 +279,20 @@ public:
     template <typename T>
     void erase_annotation() {
         annotations.erase(std::type_index(typeid(T)));
+    }
+
+    /**
+     * Copies the annotation of type T from the source object to this object.
+     * If the source object doesn't have an annotation of type T, any
+     * such annotation on this object is removed.
+     */
+    template <typename T>
+    void copy_annotation(const Annotatable &src) {
+        if (auto annotation = src.get_annotation_ptr<T>()) {
+            set_annotation(*annotation);
+        } else {
+            erase_annotation<T>();
+        }
     }
 
 };

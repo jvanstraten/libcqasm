@@ -1,3 +1,4 @@
+#include <unordered_set>
 #include "cqasm-resolver.hpp"
 
 namespace cqasm {
@@ -204,10 +205,16 @@ void ErrorModelTable::add(const error_model::ErrorModel &type) {
  * Resolves an error model. Throws NameResolutionFailure if no error model
  * by the given name exists, OverloadResolutionFailure if no overload
  * exists for the given arguments, or otherwise returns the resolved error
- * model node.
+ * model node. Annotation data and line number information still needs to be
+ * set by the caller.
  */
-error_model::ErrorModel ErrorModelTable::resolve(const std::string &name, const Values &args) const {
-    // TODO
+semantic::ErrorModel ErrorModelTable::resolve(const std::string &name, const Values &args) const {
+    auto resolved = resolver->resolve(name, args);
+    return semantic::ErrorModel(
+        resolved.first,
+        name,
+        resolved.second,
+        tree::Any<semantic::AnnotationData>());
 }
 
 InstructionTable::InstructionTable() : resolver(new OverloadedNameResolver<instruction::Instruction>()) {}
@@ -220,13 +227,68 @@ void InstructionTable::add(const instruction::Instruction &type) {
 }
 
 /**
- * Resolves an instruction. Throws NameResolutionFailure if no instruction
- * by the given name exists, OverloadResolutionFailure if no overload
- * exists for the given arguments, or otherwise returns the resolved
- * instruction node.
+ * Resolves an instruction. This can result in any of the following things:
+ *
+ *  - There is no registered instruction by the given name. This throws a
+ *    NameResolutionFailure.
+ *  - The name is known, but there is no overload for the given parameter list.
+ *    This throws an OverloadResolutionFailure.
+ *  - Conditional execution (c-) notation was used, but the instruction doesn't
+ *    support it. This throws a ConditionalExecutionNotSupported.
+ *  - One or more qubits are used more than once in the instruction, and the
+ *    instruction doesn't support this. This throws a QubitsNotUnique.
+ *  - Conditional execution (c-) notation was used and is supported, and the
+ *    condition resolves to constant false. In this case, an empty Maybe is
+ *    returned.
+ *  - The common case: a filled Maybe is returned with the resolved instruction
+ *    node. Annotation data and line number information still needs to be
+ *    copied from the AST by the caller.
  */
-instruction::Instruction InstructionTable::resolve(const std::string &name, const Values &args) const {
-    // TODO
+tree::Maybe<semantic::Instruction> InstructionTable::resolve(
+    const std::string &name,
+    const Value &condition,
+    const Values &args
+) const {
+
+    // Resolve the instruction name and overload.
+    auto resolved = resolver->resolve(name, args);
+    auto &insn = resolved.first;
+    auto &res_args = resolved.second;
+
+    // Enforce qubit uniqueness if the instruction requires us to.
+    if (!insn.allow_reused_qubits) {
+        std::unordered_set<primitives::Int> qubits_used;
+        for (const auto &arg : res_args) {
+            if (auto x = arg->as_qubit_refs()) {
+                for (auto index : x->index) {
+                    if (!qubits_used.insert(index).second) {
+                        throw QubitsNotUnique();
+                    }
+                }
+            }
+        }
+    }
+
+    // Resolve the condition code.
+    Value res_condition;
+    if (condition) {
+        if (!insn.allow_conditional) {
+            throw ConditionalExecutionNotSupported();
+        }
+        res_condition = values::promote(condition, tree::make<types::Bool>());
+        if (auto x = res_condition->as_const_bool()) {
+            if (!x->value) {
+                return tree::Maybe<semantic::Instruction>();
+            }
+        }
+    } else {
+        res_condition.set(tree::make<values::ConstBool>(true));
+    }
+
+    // Construct the bound instruction node.
+    return tree::make<semantic::Instruction>(
+        insn, name, res_condition, res_args,
+        tree::Any<semantic::AnnotationData>());
 }
 
 } // namespace resolver

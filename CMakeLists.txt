@@ -108,6 +108,7 @@ add_library(
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-error-model.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-instruction.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-resolver.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-parse-helper.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-analyzer.cpp"
 )
 

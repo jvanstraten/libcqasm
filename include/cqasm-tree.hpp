@@ -82,97 +82,103 @@ public:
     Maybe() : val() {}
 
     /**
-     * Constructor for a filled node (copy).
+     * Constructor for an empty or filled node given an existing shared_ptr.
      */
-    explicit Maybe(const T &value) : val(new T(value)) {}
-
-    /**
-     * Constructor for a filled node (move).
-     */
-    explicit Maybe(T &&value) : val(new T(std::move(value))) {}
-
-    /**
-     * Constructor for a filled node. The given raw pointer must be
-     * new-allocated.
-     */
-    explicit Maybe(T *value) : val(value) {}
+    template <class S>
+    explicit Maybe(const std::shared_ptr<S> &value) : val(std::static_pointer_cast<T>(value)) {}
 
     /**
      * Constructor for an empty or filled node given an existing shared_ptr.
      */
-    explicit Maybe(const std::shared_ptr<T> &value) : val(value) {}
+    template <class S>
+    explicit Maybe(std::shared_ptr<S> &&value) : val(std::static_pointer_cast<T>(std::move(value))) {}
 
     /**
-     * Sets the value to a copy of the object pointed to, or clears it if null.
+     * Constructor for an empty or filled node given an existing shared_ptr.
      */
-    void set(const T *ob) {
-        if (ob) {
-            val = std::make_shared(*ob);
-        } else {
-            val.reset();
-        }
+    template <class S>
+    Maybe(const Maybe<S> &value) : val(std::static_pointer_cast<T>(value.val)) {}
+
+    /**
+     * Constructor for an empty or filled node given an existing shared_ptr.
+     */
+    template <class S>
+    Maybe(Maybe<S> &&value) : val(std::static_pointer_cast<T>(std::move(value.val))) {}
+
+    /**
+     * Sets the value to a reference to the given object, or clears it if null.
+     */
+    template <class S>
+    void set(const std::shared_ptr<S> &value) {
+        val = std::static_pointer_cast<T>(value);
     }
 
     /**
-     * Sets the value to a copy of the object pointed to.
+     * Sets the value to a reference to the given object, or clears it if null.
      */
-    Maybe &operator=(const T *ob) {
-        set(*ob);
+    template <class S>
+    Maybe &operator=(const std::shared_ptr<S> &value) {
+        set<S>(value);
     }
 
     /**
-     * Sets the value to a copy of the given object.
+     * Sets the value to a reference to the given object, or clears it if null.
      */
-    void set(const T &ob) {
-        val = std::make_shared(ob);
+    template <class S>
+    void set(std::shared_ptr<S> &&value) {
+        val = std::static_pointer_cast<T>(std::move(value));
     }
 
     /**
-     * Sets the value to a copy of the given object.
+     * Sets the value to a reference to the given object, or clears it if null.
      */
-    Maybe &operator=(const T &ob) {
-        set(ob);
+    template <class S>
+    Maybe &operator=(std::shared_ptr<S> &&value) {
+        set<S>(std::move(value));
     }
 
     /**
-     * Move the given object into the contained value.
+     * Sets the value to a reference to the given object, or clears it if null.
      */
-    void set(T &&ob) {
-        val = std::make_shared(std::move(ob));
+    template <class S>
+    void set(const Maybe<S> &value) {
+        val = std::static_pointer_cast<T>(value.get_ptr());
     }
 
     /**
-     * Sets the value to a copy of the given object.
+     * Sets the value to a reference to the given object, or clears it if null.
      */
-    Maybe &operator=(T &&ob) {
-        set(std::move(ob));
+    template <class S>
+    Maybe &operator=(const Maybe<S> &value) {
+        set<S>(std::move(value));
     }
 
     /**
-     * Set the given object by means of a `shared_ptr`.
+     * Sets the value to a reference to the given object, or clears it if null.
      */
-    void set(std::shared_ptr<T> &ob) {
-        val = ob;
+    template <class S>
+    void set(Maybe<S> &&value) {
+        val = std::static_pointer_cast<T>(std::move(value.get_ptr()));
     }
 
     /**
-     * Sets the value to a copy of the given object.
+     * Sets the value to a reference to the given object, or clears it if null.
      */
-    Maybe &operator=(std::shared_ptr<T> &ob) {
-        set(ob);
+    template <class S>
+    Maybe &operator=(Maybe<S> &&value) {
+        set<S>(std::move(value));
     }
 
     /**
-     * Sets the value to the given new-initialized class. Takes ownership of
-     * the pointer.
-     *
-     * @warning Do NOT give a pointer to a statically allocated,
-     * stack-allocated, or `malloc`-allocated object to this function, because
-     * then the destructor will be wrong. You will then get weird runtime errors
-     * when the object is destroyed. Use `set()` or `operator=` instead.
+     * Sets the value to a NEW-ALLOCATED value pointed to AND TAKES OWNERSHIP.
+     * In almost all cases, you should use set(make(...)) instead! This only
+     * exists because the Yacc parser is one of the exceptions where you can't
+     * help it, because the nodes have to be stored in a union while parsing,
+     * and that can only be done with raw pointers.
      */
-    void set_raw(T *ptr) {
-        val = std::shared_ptr<T>(ptr);
+    template <class S>
+    void set_raw(S *ob) {
+        val = std::shared_ptr<T>(static_cast<T*>(ob));
     }
 
     /**
@@ -186,7 +192,14 @@ public:
      * Returns whether this Maybe is empty.
      */
     virtual bool empty() const {
-        return !val;
+        return val == nullptr;
+    }
+
+    /**
+     * Boolean operator, returns whether this Maybe is filled.
+     */
+    operator bool() const {
+        return val != nullptr;
     }
 
     /**
@@ -200,18 +213,32 @@ public:
      * Returns a mutable reference to the contained value. Raises an
      * `out_of_range` when the reference is empty.
      */
-    T &get() {
+    T &deref() {
         if (!val) {
             throw std::out_of_range("dereferencing empty Maybe/One object");
         }
         return *val;
+    }
+
+    /**
+     * Mutable dereference operator, shorthand for `deref()`.
+     */
+    T &operator*() {
+        return deref();
+    }
+
+    /**
+     * Mutable dereference operator, shorthand for `deref()`.
+     */
+    T *operator->() {
+        return &deref();
     }
 
     /**
      * Returns a const reference to the contained value. Raises an
      * `out_of_range` when the reference is empty.
      */
-    const T &get() const {
+    const T &deref() const {
         if (!val) {
             throw std::out_of_range("dereferencing empty Maybe/One object");
         }
@@ -219,45 +246,52 @@ public:
     }
 
     /**
-     * Returns a copy of the contained shared_ptr.
+     * Constant dereference operator, shorthand for `deref()`.
+     */
+    const T &operator*() const {
+        return deref();
+    }
+
+    /**
+     * Constant dereference operator, shorthand for `deref()`.
+     */
+    const T *operator->() const {
+        return &deref();
+    }
+
+    /**
+     * Returns an immutable copy of the underlying shared_ptr.
+     */
+    const std::shared_ptr<T> &get_ptr() const {
+        return val;
+    }
+
+    /**
+     * Returns a mutable copy of the underlying shared_ptr.
      */
     std::shared_ptr<T> &get_ptr() {
         return val;
     }
 
     /**
-     * Mutable dereference operator, shorthand for `get()`.
+     * Up- or downcasts this value. If the cast succeeds, the returned value
+     * is nonempty and its shared_ptr points to the same data block as this
+     * value does. If the cast fails, an empty Maybe is returned.
      */
-    T &operator*() {
-        return get();
-    }
-
-    /**
-     * Constant dereference operator, shorthand for `get()`.
-     */
-    const T &operator*() const {
-        return get();
-    }
-
-    /**
-     * Mutable dereference operator, shorthand for `get()`.
-     */
-    T *operator->() {
-        return &get();
-    }
-
-    /**
-     * Constant dereference operator, shorthand for `get()`.
-     */
-    const T *operator->() const {
-        return &get();
+    template <class S>
+    Maybe<S> as() const {
+        return Maybe<S>(std::dynamic_pointer_cast<S>(val));
     }
 
     /**
      * Equality operator.
      */
     bool operator==(const Maybe& rhs) const {
-        return val == rhs.val;
+        if (val && rhs.get_ptr()) {
+            return *val == *rhs;
+        } else {
+            return val == rhs.get_ptr();
+        }
     }
 
     /**
@@ -265,13 +299,6 @@ public:
      */
     inline bool operator!=(const Maybe& rhs) const {
         return !(*this == rhs);
-    }
-
-    /**
-     * Boolean operator.
-     */
-    operator bool() const {
-        return val != nullptr;
     }
 
     /**
@@ -306,25 +333,28 @@ public:
     One() : Maybe<T>() {}
 
     /**
-     * Constructor for a filled node (copy).
+     * Constructor for an empty or filled node given an existing shared_ptr.
      */
-    explicit One(const T &value) : Maybe<T>(value) {}
-
-    /**
-     * Constructor for a filled node (move).
-     */
-    explicit One(T &&value) : Maybe<T>(std::move(value)) {}
-
-    /**
-     * Constructor for a filled node. The given raw pointer must be
-     * new-allocated.
-     */
-    explicit One(T *value) : Maybe<T>(value) {}
+    template <class S>
+    explicit One(const std::shared_ptr<S> &value) : Maybe<T>(value) {}
 
     /**
      * Constructor for an empty or filled node given an existing shared_ptr.
      */
-    explicit One(const std::shared_ptr<T> &value) : Maybe<T>(value) {}
+    template <class S>
+    explicit One(std::shared_ptr<S> &&value) : Maybe<T>(std::move(value)) {}
+
+    /**
+     * Constructor for an empty or filled node given an existing Maybe.
+     */
+    template <class S>
+    One(const Maybe<S> &value) : Maybe<T>(value.get_ptr()) {}
+
+    /**
+     * Constructor for an empty or filled node given an existing Maybe.
+     */
+    template <class S>
+    One(Maybe<S> &&value) : Maybe<T>(std::move(value.get_ptr())) {}
 
     /**
      * Returns whether this object is complete/fully defined.
@@ -336,6 +366,14 @@ public:
 };
 
 /**
+ * Constructs a One object, analogous to std::make_shared.
+ */
+template <class T, typename... Args>
+One<T> make(Args... args) {
+    return One<T>(std::make_shared<T>(args...));
+}
+
+/**
  * Convenience class for zero or more AST nodes.
  */
 template <class T>
@@ -343,80 +381,47 @@ class Any : public Base {
 protected:
 
     /**
-     * The contained vector. The `shared_ptr`s are assumed to be non-null.
+     * The contained vector.
      */
     std::vector<One<T>> vec;
 
 public:
 
     /**
-     * Adds the value pointed to by copy. No-operation when ob is null.
+     * Adds the given value. No-op when the value is empty.
      */
-    void add(const T *ob, ssize_t pos=-1) {
+    template <class S>
+    void add(const Maybe<S> &ob, ssize_t pos=-1) {
         if (!ob) {
             return;
         }
         if (pos < 0 || (size_t)pos >= size()) {
-            this->vec.emplace_back(std::make_shared(*ob));
+            this->vec.emplace_back(
+                std::static_pointer_cast<T>(ob.get_ptr()));
         } else {
-            this->vec.emplace(this->vec.cbegin() + pos, std::make_shared(*ob));
+            this->vec.emplace(this->vec.cbegin() + pos,
+                              std::static_pointer_cast<T>(
+                                  ob.get_ptr()));
         }
     }
 
     /**
-     * Adds the given value by copy.
+     * Adds the NEW-ALLOCATED value pointed to AND TAKES OWNERSHIP. In almost
+     * all cases, you should use add(make(...), pos) instead! This only exists
+     * because the Yacc parser is one of the exceptions where you can't help
+     * it, because the nodes have to be stored in a union while parsing, and
+     * that can only be done with raw pointers.
      */
-    void add(const T &ob, ssize_t pos=-1) {
-        if (pos < 0 || (size_t)pos >= size()) {
-            this->vec.emplace_back(std::make_shared(ob));
-        } else {
-            this->vec.emplace(this->vec.cbegin() + pos, std::make_shared(ob));
-        }
-    }
-
-    /**
-     * Adds the given value by move.
-     */
-    void add(T &&ob, ssize_t pos=-1) {
-        if (pos < 0 || (size_t)pos >= size()) {
-            this->vec.emplace_back(std::make_shared(std::move(ob)));
-        } else {
-            this->vec.emplace(this->vec.cbegin() + pos, std::make_shared(std::move(ob)));
-        }
-    }
-
-    /**
-     * Set the given object by means of a `shared_ptr`. No operation when op is
-     * null.
-     */
-    void add(std::shared_ptr<T> &ob, ssize_t pos=-1) {
+    template <class S>
+    void add_raw(S *ob, ssize_t pos=-1) {
         if (!ob) {
-            return;
+            throw std::runtime_error("add_raw called with nullptr!");
         }
         if (pos < 0 || (size_t)pos >= size()) {
-            this->vec.emplace_back(ob);
+            this->vec.emplace_back(std::shared_ptr<T>(static_cast<T*>(ob)));
         } else {
-            this->vec.emplace(this->vec.cbegin() + pos, ob);
+            this->vec.emplace(this->vec.cbegin() + pos, std::shared_ptr<T>(static_cast<T*>(ob)));
         }
-    }
-
-    /**
-     * Adds by means of a One or Maybe object. No operation when op is empty.
-     */
-    void add(Maybe<T> &ob, ssize_t pos=-1) {
-        add(ob.get_ptr(), pos);
-    }
-
-    /**
-     * Appends the given new-initialized class. Takes ownership of the pointer.
-     *
-     * @warning Do NOT give a pointer to a statically allocated,
-     * stack-allocated, or `malloc`-allocated object to this function, because
-     * then the destructor will be wrong. You will then get weird runtime errors
-     * when the object is destroyed. Use `set()` or `operator=` instead.
-     */
-    void add_raw(T *ptr) {
-        this->vec.emplace_back(ptr);
     }
 
     /**
@@ -470,19 +475,19 @@ public:
     }
 
     /**
-     * Returns an immutable reference to the contained value at the given
-     * index. Raises an `out_of_range` when the reference is empty.
-     */
-    const One<T> &at(size_t index) const {
-        return vec.at(index);
-    }
-
-    /**
      * Shorthand for `at()`. Unlike std::vector's operator[], this also checks
      * bounds.
      */
     One<T> &operator[] (size_t index) {
         return at(index);
+    }
+
+    /**
+     * Returns an immutable reference to the contained value at the given
+     * index. Raises an `out_of_range` when the reference is empty.
+     */
+    const One<T> &at(size_t index) const {
+        return vec.at(index);
     }
 
     /**

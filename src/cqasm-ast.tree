@@ -10,8 +10,8 @@ tree_namespace cqasm::tree
 include "cqasm-primitives.hpp"
 
 # Include SourceLocation annotation object for the debug dump generator.
-src_include "cqasm-analyzer.hpp"
-location cqasm::SourceLocation
+src_include "cqasm-parse-helper.hpp"
+location cqasm::parser::SourceLocation
 
 # Namespace declarations for the AST nodes.
 namespace cqasm

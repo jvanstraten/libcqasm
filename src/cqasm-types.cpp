@@ -80,7 +80,7 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::types::Type& type) {
     if (type.empty()) {
         os << "NULL";
     } else {
-        os << type.get();
+        os << *type;
     }
     return os;
 }
