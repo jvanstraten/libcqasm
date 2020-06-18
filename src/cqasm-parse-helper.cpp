@@ -6,10 +6,29 @@ namespace cqasm {
 namespace parser {
 
 /**
+ * Parse the given file.
+ */
+ParseResult parse_file(const std::string &filename) {
+    return std::move(ParseHelper(filename, "", true).result);
+}
+
+/**
+ * Parse the given string. A filename may be given in addition for use within
+ * error messages.
+ */
+ParseResult parse_string(const std::string &data, const std::string &filename) {
+    return std::move(ParseHelper(filename, data, false).result);
+}
+
+/**
  * Construct the analyzer internals for the given filename, and analyze
  * the file.
  */
-ParseHelper::ParseHelper(const std::string &filename) : filename(filename) {
+ParseHelper::ParseHelper(
+    const std::string &filename,
+    const std::string &data,
+    bool use_file
+) : filename(filename) {
     int retcode;
 
     // Create the scanner.
@@ -21,15 +40,20 @@ ParseHelper::ParseHelper(const std::string &filename) : filename(filename) {
         return;
     }
 
-    // Try to open the file and read it to an internal string.
-    fptr = fopen(filename.c_str(), "r");
-    if (!fptr) {
-        std::ostringstream sb;
-        sb << "Failed to open input file " << filename << ": " << strerror(errno);
-        push_error(sb.str());
-        return;
+    // Open the file or pass the data buffer to flex.
+    if (use_file) {
+        fptr = fopen(filename.c_str(), "r");
+        if (!fptr) {
+            std::ostringstream sb;
+            sb << "Failed to open input file " << filename << ": "
+               << strerror(errno);
+            push_error(sb.str());
+            return;
+        }
+        yyset_in(fptr, (yyscan_t)scanner);
+    } else {
+        buf = yy_scan_string(data.c_str(), (yyscan_t)scanner);
     }
-    yyset_in(fptr, (yyscan_t)scanner);
 
     // Do the actual parsing.
     retcode = yyparse((yyscan_t)scanner, *this);
@@ -54,6 +78,9 @@ ParseHelper::~ParseHelper() {
     if (fptr) {
         fclose(fptr);
     }
+    if (buf) {
+        yy_delete_buffer((YY_BUFFER_STATE)buf, (yyscan_t)scanner);
+    }
     if (scanner) {
         yylex_destroy((yyscan_t)scanner);
     }
@@ -63,7 +90,7 @@ ParseHelper::~ParseHelper() {
  * Pushes an error.
  */
 void ParseHelper::push_error(const std::string &error) {
-    errors.push_back(error);
+    result.errors.push_back(error);
 }
 
 /**

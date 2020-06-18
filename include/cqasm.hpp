@@ -1,4 +1,8 @@
 #pragma once
 
-#include "cqasm-ast.hpp"
+#include "cqasm-parse-helper.hpp"
 #include "cqasm-analyzer.hpp"
+
+namespace cqasm {
+
+}

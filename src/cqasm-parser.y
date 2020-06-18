@@ -338,8 +338,8 @@ Program         : OptNewline VERSION Version Newline
                 ;
 
 /* Toplevel. */
-Root            : Program                                                       { helper.root.set_raw($1); }
-                | error                                                         { helper.root.set_raw(new ErroneousProgram()); }
+Root            : Program                                                       { helper.result.root.set_raw($1); }
+                | error                                                         { helper.result.root.set_raw(new ErroneousProgram()); }
                 ;
 
 %%

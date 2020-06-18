@@ -1,11 +1,42 @@
 #pragma once
 
 #include "cqasm-ast.hpp"
-#include "cqasm-semantic.hpp"
 #include <cstdio>
 
 namespace cqasm {
 namespace parser {
+
+/**
+ * Parse result information.
+ */
+class ParseResult {
+public:
+
+    /**
+     * Root node of the AST, if analysis was sufficiently successful. This may
+     * be set even if parsing was not ENTIRELY successful, in which case it
+     * will contain one or more error nodes.
+     */
+    ast::One<ast::Root> root;
+
+    /**
+     * List of accumulated errors. Analysis was successful if and only if
+     * `errors.empty()`.
+     */
+    std::vector<std::string> errors;
+
+};
+
+/**
+ * Parse the given file.
+ */
+ParseResult parse_file(const std::string &filename);
+
+/**
+ * Parse the given string. A filename may be given in addition for use within
+ * error messages.
+ */
+ParseResult parse_string(const std::string &data, const std::string &filename="<unknown>");
 
 /**
  * Internal helper class for parsing cQASM files.
@@ -14,9 +45,14 @@ class ParseHelper {
 public:
 
     /**
-     * File pointer being scanned.
+     * File pointer being scanned, if no data was specified.
      */
     FILE *fptr = nullptr;
+
+    /**
+     * Flex data buffer, if data was specified.
+     */
+    void *buf = nullptr;
 
     /**
      * Flex reentrant scanner data.
@@ -29,20 +65,23 @@ public:
     std::string filename;
 
     /**
-     * List of any errors encountered.
+     * The parse result.
      */
-    std::vector<std::string> errors;
+    ParseResult result;
+
+private:
+    friend ParseResult parse_file(const std::string &filename);
+    friend ParseResult parse_string(const std::string &data, const std::string &filename);
 
     /**
-     * The root node, if parsing was sufficiently successful.
+     * Parse a string or file with flex/bison. If use_file is set, the file
+     * specified by filename is read and data is ignored. Otherwise, filename
+     * is used only for error messages, and data is read instead. Don't use
+     * this directly, use parse().
      */
-    tree::One<ast::Root> root;
+    ParseHelper(const std::string &filename, const std::string &data, bool use_file);
 
-    /**
-     * Construct the parse helper for the given filename, and analyze the file
-     * with flex/bison.
-     */
-    ParseHelper(const std::string &filename);
+public:
 
     /**
      * Destroys the parse helper.

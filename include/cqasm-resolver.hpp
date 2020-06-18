@@ -51,6 +51,27 @@ public:
     }
 };
 
+/**
+ * Table of all mappings within a certain scope.
+ */
+class MappingTable {
+private:
+    std::unordered_map<std::string, const values::Value> table;
+public:
+
+    /**
+     * Adds a mapping.
+     */
+    void add(const std::string &name, const values::Value &value);
+
+    /**
+     * Resolves a mapping. Throws NameResolutionFailure if no mapping by the
+     * given name exists.
+     */
+    values::Value call(const std::string &name) const;
+
+};
+
 // Forward declaration for the name resolver template class. This class is
 // defined entirely in the C++ file to cut back on compile time.
 template <class T>

@@ -10,6 +10,37 @@ using Value = values::Value;
 using Values = values::Values;
 
 /**
+ * Makes a string lowercase.
+ */
+std::string lowercase(const std::string &name) {
+    std::string name_lower = name;
+    std::for_each(name_lower.begin(), name_lower.end(), [](char &c){
+        c = std::tolower(c);
+    });
+    return name_lower;
+}
+
+/**
+ * Adds a mapping.
+ */
+void MappingTable::add(const std::string &name, const Value &value) {
+    table.insert(std::make_pair(lowercase(name), value));
+}
+
+/**
+ * Resolves a mapping. Throws NameResolutionFailure if no mapping by the
+ * given name exists.
+ */
+Value MappingTable::call(const std::string &name) const {
+    auto entry = table.find(lowercase(name));
+    if (entry == table.end()) {
+        throw NameResolutionFailure();
+    } else {
+        return entry->second;
+    }
+}
+
+/**
  * Represents a possible overload for the parameter types of a function, gate,
  * or error model. T is some tag type identifying the overload.
  */
@@ -124,10 +155,7 @@ public:
      * added first.
      */
     void add_overload(const std::string &name, const T &tag, const Types &param_types) {
-        std::string name_lower = name;
-        std::for_each(name_lower.begin(), name_lower.end(), [](char &c){
-            c = std::tolower(c);
-        });
+        std::string name_lower = lowercase(name);
         auto entry = table.find(name_lower);
         if (entry == table.end()) {
             auto resolver = OverloadResolver<T>();
@@ -147,10 +175,7 @@ public:
      * appropriately promoted vector of value pointers.
      */
     std::pair<T, Values> resolve(const std::string &name, const Values &args) {
-        std::string name_lower = name;
-        std::for_each(name_lower.begin(), name_lower.end(), [](char &c){
-            c = std::tolower(c);
-        });
+        std::string name_lower = lowercase(name);
         auto entry = table.find(name_lower);
         if (entry == table.end()) {
             throw NameResolutionFailure();
