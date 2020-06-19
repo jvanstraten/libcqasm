@@ -53,10 +53,40 @@ public:
     void analyze_qubits(const ast::Expression &count);
 
     /**
+     * Analyzes the given bundle and, if valid, adds it to the current
+     * subcircuit. If an error occurs, the message is added to the result
+     * error vector, and nothing is added to the subcircuit.
+     */
+    void analyze_bundle(const ast::Bundle &bundle);
+
+    /**
+     * Analyzes the given mapping and, if valid, adds it to the current
+     * scope. If an error occurs, the message is added to the result
+     * error vector, and nothing is added to the scope.
+     */
+    void analyze_mapping(const ast::Mapping &mapping);
+
+    /**
+     * Analyzes the given subcircuit header and, if valid, adds it to the
+     * subcircuit list. If an error occurs, the message is added to the result
+     * error vector, and nothing is added to the result.
+     */
+    void analyze_subcircuit(const ast::Subcircuit &subcircuit);
+
+    /**
+     * Analyzes the given list of annotations. Any errors found result in the
+     * annotation being skipped and an error being appended to the result error
+     * vector.
+     */
+    tree::Any<semantic::AnnotationData> analyze_annotations(
+        const tree::Any<ast::AnnotationData> &annotations
+    );
+
+    /**
      * Parses any kind of expression. Always returns a filled value or throws
      * an exception.
      */
-    values::Value parse_expression(const ast::Expression &expression);
+    values::Value analyze_expression(const ast::Expression &expression);
 
     /**
      * Shorthand for parsing an expression and promoting it to the given type,
@@ -64,7 +94,7 @@ public:
      * when the cast fails.
      */
     template<class Type, class... TypeArgs>
-    values::Value parse_expression_as(
+    values::Value analyze_as(
         const ast::Expression &expression,
         TypeArgs... type_args
     );
@@ -72,12 +102,12 @@ public:
     /**
      * Shorthand for parsing an expression to a constant integer.
      */
-    primitives::Int parse_const_int(const ast::Expression &expression);
+    primitives::Int analyze_as_const_int(const ast::Expression &expression);
 
     /**
      * Parses a matrix. Always returns a filled value or throws an exception.
      */
-    values::Value parse_matrix(const ast::MatrixLiteral &matrix_lit);
+    values::Value analyze_matrix(const ast::MatrixLiteral &matrix_lit);
 
     /**
      * Helper for parsing a matrix. Highly templated to avoid repeating the
@@ -85,7 +115,7 @@ public:
      * template parameters are codependent. Returns empty on failure.
      */
     template<class ElType, class ElVal, class MatLit, class MatVal>
-    values::Value parse_matrix_helper(
+    values::Value analyze_matrix_helper(
         size_t nrows, size_t ncols,
         const std::vector<values::Value> &vals
     );
@@ -94,18 +124,19 @@ public:
      * Parses an index operator. Always returns a filled value or throws an
      * error.
      */
-    values::Value parse_index(const ast::Index &index);
+    values::Value analyze_index(const ast::Index &index);
 
     /**
      * Parses an index list.
      */
-    tree::Many<values::ConstInt>
-    parse_index_list(const ast::IndexList &index_list, size_t size);
+    tree::Many<values::ConstInt> analyze_index_list(
+        const ast::IndexList &index_list, size_t size
+    );
 
     /**
      * Parses a function. Always returns a filled value or throws an exception.
      */
-    values::Value parse_function(
+    values::Value analyze_function(
         const ast::Identifier &name,
         const ast::ExpressionList &args
     );
@@ -113,7 +144,7 @@ public:
     /**
      * Parses an operator. Always returns a filled value or throws an exception.
      */
-    values::Value parse_operator(
+    values::Value analyze_operator(
         const std::string &name,
         const tree::One<ast::Expression> &a,
         const tree::One<ast::Expression> &b = tree::One<ast::Expression>()
@@ -151,7 +182,23 @@ AnalyzerHelper::AnalyzerHelper(
         // Handle the qubits statement.
         analyze_qubits(*ast.num_qubits);
 
-        // TODO
+        // Read the statements.
+        for (auto stmt : ast.statements->items) {
+            try {
+                if (auto bundle = stmt->as_bundle()) {
+                    analyze_bundle(*bundle);
+                } else if (auto mapping = stmt->as_mapping()) {
+                    analyze_mapping(*mapping);
+                } else if (auto subcircuit = stmt->as_subcircuit()) {
+                    analyze_subcircuit(*subcircuit);
+                } else {
+                    throw std::runtime_error("unexpected expression node");
+                }
+            } catch (error::AnalysisError &e) {
+                e.context(*stmt);
+                result.errors.push_back(e.get_message());
+            }
+        }
 
     } catch (error::AnalysisError &e) {
         result.errors.push_back(e.get_message());
@@ -187,7 +234,7 @@ void AnalyzerHelper::analyze_qubits(const ast::Expression &count) {
         result.root->num_qubits = 0;
 
         // Try to load the number of qubits from the expression.
-        result.root->num_qubits = parse_const_int(count);
+        result.root->num_qubits = analyze_as_const_int(count);
         if (result.root->num_qubits < 1) {
             // Number of qubits must be positive.
             throw error::AnalysisError("invalid number of qubits");
@@ -211,10 +258,70 @@ void AnalyzerHelper::analyze_qubits(const ast::Expression &count) {
 }
 
 /**
+ * Analyzes the given bundle and, if valid, adds it to the current
+ * subcircuit. If an error occurs, the message is added to the result
+ * error vector, and nothing is added to the subcircuit.
+ */
+void AnalyzerHelper::analyze_bundle(const ast::Bundle &bundle) {
+    // TODO
+}
+
+/**
+ * Analyzes the given mapping and, if valid, adds it to the current
+ * scope. If an error occurs, the message is added to the result
+ * error vector, and nothing is added to the scope.
+ */
+void AnalyzerHelper::analyze_mapping(const ast::Mapping &mapping) {
+    scope.mappings.add(mapping.alias->name, analyze_expression(*mapping.expr));
+}
+
+/**
+ * Analyzes the given subcircuit header and, if valid, adds it to the
+ * subcircuit list. If an error occurs, the message is added to the result
+ * error vector, and nothing is added to the result.
+ */
+void AnalyzerHelper::analyze_subcircuit(const ast::Subcircuit &subcircuit) {
+    primitives::Int iterations = 1;
+    if (subcircuit.iterations) {
+        iterations = analyze_as_const_int(*subcircuit.iterations);
+        if (iterations < 1) {
+            throw error::AnalysisError(
+                "subcircuit iteration count must be positive, but is"
+                + std::to_string(iterations), &*subcircuit.iterations);
+        }
+    }
+    result.root->subcircuits.add(tree::make<semantic::Subcircuit>(
+        subcircuit.name->name,
+        iterations,
+        tree::Any<semantic::Bundle>(),
+        analyze_annotations(subcircuit.annotations)));
+}
+
+/**
+ * Analyzes the given list of annotations. Any errors found result in the
+ * annotation being skipped and an error being appended to the result error
+ * vector.
+ */
+tree::Any<semantic::AnnotationData> AnalyzerHelper::analyze_annotations(
+    const tree::Any<ast::AnnotationData> &annotations
+) {
+    auto retval = tree::Any<semantic::AnnotationData>();
+    for (auto ast : annotations) {
+        try {
+            // TODO
+        } catch (error::AnalysisError &e) {
+            e.context(*ast);
+            result.errors.push_back(e.get_message());
+        }
+    }
+    return retval;
+}
+
+/**
  * Parses any kind of expression. Always returns a filled value or throws
  * an exception.
  */
-values::Value AnalyzerHelper::parse_expression(const ast::Expression &expression) {
+values::Value AnalyzerHelper::analyze_expression(const ast::Expression &expression) {
     values::Value retval;
     try {
         if (auto int_lit = expression.as_integer_literal()) {
@@ -226,25 +333,25 @@ values::Value AnalyzerHelper::parse_expression(const ast::Expression &expression
         } else if (auto json_lit = expression.as_json_literal()) {
             retval.set(tree::make<values::ConstJson>(json_lit->value));
         } else if (auto matrix_lit = expression.as_matrix_literal()) {
-            retval.set(parse_matrix(*matrix_lit));
+            retval.set(analyze_matrix(*matrix_lit));
         } else if (auto ident = expression.as_identifier()) {
             retval.set(scope.mappings.resolve(ident->name));
         } else if (auto index = expression.as_index()) {
-            retval.set(parse_index(*index));
+            retval.set(analyze_index(*index));
         } else if (auto func = expression.as_function_call()) {
-            retval.set(parse_function(func->name->name, *func->arguments));
+            retval.set(analyze_function(func->name->name, *func->arguments));
         } else if (auto negate = expression.as_negate()) {
-            retval.set(parse_operator("-", negate->expr));
+            retval.set(analyze_operator("-", negate->expr));
         } else if (auto power = expression.as_power()) {
-            retval.set(parse_operator("**", power->lhs, power->rhs));
+            retval.set(analyze_operator("**", power->lhs, power->rhs));
         } else if (auto mult = expression.as_multiply()) {
-            retval.set(parse_operator("*", mult->lhs, mult->rhs));
+            retval.set(analyze_operator("*", mult->lhs, mult->rhs));
         } else if (auto div = expression.as_divide()) {
-            retval.set(parse_operator("/", div->lhs, div->rhs));
+            retval.set(analyze_operator("/", div->lhs, div->rhs));
         } else if (auto add = expression.as_add()) {
-            retval.set(parse_operator("+", add->lhs, add->rhs));
+            retval.set(analyze_operator("+", add->lhs, add->rhs));
         } else if (auto sub = expression.as_subtract()) {
-            retval.set(parse_operator("-", sub->lhs, sub->rhs));
+            retval.set(analyze_operator("-", sub->lhs, sub->rhs));
         } else {
             throw std::runtime_error("unexpected expression node");
         }
@@ -254,7 +361,7 @@ values::Value AnalyzerHelper::parse_expression(const ast::Expression &expression
     }
     if (!retval) {
         throw std::runtime_error(
-            "parse_expression returned nonsense, this should never happen");
+            "analyze_expression returned nonsense, this should never happen");
     }
     retval->copy_annotation<parser::SourceLocation>(expression);
     return retval;
@@ -266,15 +373,15 @@ values::Value AnalyzerHelper::parse_expression(const ast::Expression &expression
  * when the cast fails.
  */
 template <class Type, class... TypeArgs>
-values::Value AnalyzerHelper::parse_expression_as(const ast::Expression &expression, TypeArgs... type_args) {
-    return values::promote(parse_expression(expression), tree::make<Type>(type_args...));
+values::Value AnalyzerHelper::analyze_as(const ast::Expression &expression, TypeArgs... type_args) {
+    return values::promote(analyze_expression(expression), tree::make<Type>(type_args...));
 }
 
 /**
  * Shorthand for parsing an expression to a constant integer.
  */
-primitives::Int AnalyzerHelper::parse_const_int(const ast::Expression &expression) {
-    auto value = parse_expression_as<types::Int>(expression);
+primitives::Int AnalyzerHelper::analyze_as_const_int(const ast::Expression &expression) {
+    auto value = analyze_as<types::Int>(expression);
     if (auto int_value = value->as_const_int()) {
         return int_value->value;
     } else {
@@ -285,7 +392,7 @@ primitives::Int AnalyzerHelper::parse_const_int(const ast::Expression &expressio
 /**
  * Parses a matrix. Always returns a filled value or throws an exception.
  */
-values::Value AnalyzerHelper::parse_matrix(const ast::MatrixLiteral &matrix_lit) {
+values::Value AnalyzerHelper::analyze_matrix(const ast::MatrixLiteral &matrix_lit) {
 
     // Figure out the size of the matrix and parse the subexpressions.
     // Note that the number of rows is always at least 1 (Many vs Any) so
@@ -295,12 +402,12 @@ values::Value AnalyzerHelper::parse_matrix(const ast::MatrixLiteral &matrix_lit)
     std::vector<values::Value> vals;
     for (size_t row = 0; row < nrows; row++) {
         for (size_t col = 0; col < ncols; col++) {
-            vals.push_back(parse_expression(*matrix_lit.rows[row]->items[col]));
+            vals.push_back(analyze_expression(*matrix_lit.rows[row]->items[col]));
         }
     }
 
     // Try building a matrix of constant real numbers.
-    auto value = parse_matrix_helper<
+    auto value = analyze_matrix_helper<
         types::Real, values::ConstReal,
         primitives::RMatrix, values::ConstRealMatrix
     >(nrows, ncols, vals);
@@ -309,7 +416,7 @@ values::Value AnalyzerHelper::parse_matrix(const ast::MatrixLiteral &matrix_lit)
     }
 
     // Try building a matrix of constant complex numbers.
-    value = parse_matrix_helper<
+    value = analyze_matrix_helper<
         types::Complex, values::ConstComplex,
         primitives::CMatrix, values::ConstComplexMatrix
     >(nrows, ncols, vals);
@@ -330,7 +437,7 @@ values::Value AnalyzerHelper::parse_matrix(const ast::MatrixLiteral &matrix_lit)
  * template parameters are codependent. Returns empty on failure.
  */
 template <class ElType, class ElVal, class MatLit, class MatVal>
-values::Value AnalyzerHelper::parse_matrix_helper(
+values::Value AnalyzerHelper::analyze_matrix_helper(
     size_t nrows, size_t ncols,
     const std::vector<values::Value> &vals
 ) {
@@ -352,12 +459,13 @@ values::Value AnalyzerHelper::parse_matrix_helper(
 /**
  * Parses an index operator. Always returns a filled value or throws an error.
  */
-values::Value AnalyzerHelper::parse_index(const ast::Index &index) {
-    auto expr = parse_expression(*index.expr);
+values::Value AnalyzerHelper::analyze_index(const ast::Index &index) {
+    auto expr = analyze_expression(*index.expr);
     if (auto qubit_refs = expr->as_qubit_refs()) {
 
         // Qubit refs.
-        auto indices = parse_index_list(*index.indices, qubit_refs->index.size());
+        auto indices = analyze_index_list(*index.indices,
+                                          qubit_refs->index.size());
         for (auto idx : indices) {
             idx->value = qubit_refs->index[idx->value]->value;
         }
@@ -366,7 +474,8 @@ values::Value AnalyzerHelper::parse_index(const ast::Index &index) {
     } else if (auto bit_refs = expr->as_bit_refs()) {
 
         // Measurement bit refs.
-        auto indices = parse_index_list(*index.indices, bit_refs->index.size());
+        auto indices = analyze_index_list(*index.indices,
+                                          bit_refs->index.size());
         for (auto idx : indices) {
             idx->value = bit_refs->index[idx->value]->value;
         }
@@ -386,13 +495,13 @@ values::Value AnalyzerHelper::parse_index(const ast::Index &index) {
 /**
  * Parses an index list.
  */
-tree::Many<values::ConstInt> AnalyzerHelper::parse_index_list(const ast::IndexList &index_list, size_t size) {
+tree::Many<values::ConstInt> AnalyzerHelper::analyze_index_list(const ast::IndexList &index_list, size_t size) {
     tree::Many<values::ConstInt> retval;
     for (auto entry : index_list.items) {
         if (auto item = entry->as_index_item()) {
 
             // Single index.
-            auto index = parse_const_int(*item->index);
+            auto index = analyze_as_const_int(*item->index);
             if (index < 0 || (unsigned long)index >= size) {
                 throw error::AnalysisError(
                     "index " + std::to_string(index)
@@ -406,14 +515,14 @@ tree::Many<values::ConstInt> AnalyzerHelper::parse_index_list(const ast::IndexLi
         } else if (auto range = entry->as_index_range()) {
 
             // Range notation.
-            auto first = parse_const_int(*range->first);
+            auto first = analyze_as_const_int(*range->first);
             if (first < 0 || (unsigned long)first >= size) {
                 throw error::AnalysisError(
                     "index " + std::to_string(first)
                     + " out of range (size " + std::to_string(size) + ")",
                     &*range->first);
             }
-            auto last = parse_const_int(*range->last);
+            auto last = analyze_as_const_int(*range->last);
             if (last < 0 || (unsigned long)last >= size) {
                 throw error::AnalysisError(
                     "index " + std::to_string(last)
@@ -439,10 +548,10 @@ tree::Many<values::ConstInt> AnalyzerHelper::parse_index_list(const ast::IndexLi
 /**
  * Parses a function. Always returns a filled value or throws an exception.
  */
-values::Value AnalyzerHelper::parse_function(const ast::Identifier &name, const ast::ExpressionList &args) {
+values::Value AnalyzerHelper::analyze_function(const ast::Identifier &name, const ast::ExpressionList &args) {
     auto arg_values = values::Values();
     for (auto arg : args.items) {
-        arg_values.add(parse_expression(*arg));
+        arg_values.add(analyze_expression(*arg));
     }
     auto retval = scope.functions.call(name.name, arg_values);
     if (!retval) {
@@ -454,7 +563,7 @@ values::Value AnalyzerHelper::parse_function(const ast::Identifier &name, const 
 /**
  * Parses an operator. Always returns a filled value or throws an exception.
  */
-values::Value AnalyzerHelper::parse_operator(
+values::Value AnalyzerHelper::analyze_operator(
     const std::string &name,
     const tree::One<ast::Expression> &a,
     const tree::One<ast::Expression> &b
@@ -463,7 +572,7 @@ values::Value AnalyzerHelper::parse_operator(
     auto args = ast::ExpressionList();
     args.items.add(a);
     args.items.add(b);
-    return parse_function(identifier, args);
+    return analyze_function(identifier, args);
 }
 
 } // namespace analyzer

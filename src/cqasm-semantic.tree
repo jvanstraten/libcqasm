@@ -124,6 +124,6 @@ program {
     error_model: Maybe<error_model>;
 
     # The list of subcircuit.
-    kernels: Any<subcircuit>;
+    subcircuits: Any<subcircuit>;
 
 }
