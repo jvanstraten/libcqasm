@@ -207,10 +207,8 @@ static void generate_node_class(
     }
 
     // Print constructors.
-    format_doc(header, "Default constructor.", "    ");
-    header << "    " << node.title_case_name << "() = default;" << std::endl << std::endl;
     if (!all_children.empty()) {
-        format_doc(header, "Constructor with values.", "    ");
+        format_doc(header, "Constructor.", "    ");
         header << "    " << node.title_case_name << "(";
         bool first = true;
         for (auto &child : all_children) {
@@ -227,11 +225,18 @@ static void generate_node_class(
                 case Many:  header << "Many<"  << child.node_type->title_case_name << "> "; break;
                 case Prim:  header << child.prim_type << " "; break;
             }
-            header << "&" << child.name;
+            header << "&" << child.name << " = ";
+            switch (child.type) {
+                case Maybe: header << "Maybe<" << child.node_type->title_case_name << ">()"; break;
+                case One:   header << "One<"   << child.node_type->title_case_name << ">()"; break;
+                case Any:   header << "Any<"   << child.node_type->title_case_name << ">()"; break;
+                case Many:  header << "Many<"  << child.node_type->title_case_name << ">()"; break;
+                case Prim:  header << "cqasm::primitives::initialize<" << child.prim_type << ">()"; break;
+            }
         }
         header << ");" << std::endl << std::endl;
 
-        format_doc(source, "Constructor with values.", "");
+        format_doc(source, "Constructor.", "");
         source << node.title_case_name << "::" << node.title_case_name << "(";
         first = true;
         for (auto &child : all_children) {

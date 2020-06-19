@@ -32,6 +32,7 @@ public:
  */
 class Analyzer {
 private:
+    friend class AnalyzerHelper;
 
     /**
      * The set of "mappings" that the parser starts out with (map statements in
@@ -84,13 +85,6 @@ private:
      * uninitialized.
      */
     bool resolve_error_model;
-
-    /**
-     * Parses the given expression into a value using the given mapping scope.
-     */
-    values::Value parse_expression(
-        const ast::Expression &expression,
-        const resolver::MappingTable &scope) const;
 
 public:
 

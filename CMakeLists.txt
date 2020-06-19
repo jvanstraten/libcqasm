@@ -101,6 +101,7 @@ add_library(
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-values-gen.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-semantic-gen.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-error.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-primitives.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-ast.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-types.cpp"

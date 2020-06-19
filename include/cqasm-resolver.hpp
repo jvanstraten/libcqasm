@@ -5,6 +5,7 @@
 #include "cqasm-error-model.hpp"
 #include "cqasm-instruction.hpp"
 #include "cqasm-semantic.hpp"
+#include "cqasm-error.hpp"
 
 namespace cqasm {
 namespace resolver {
@@ -12,44 +13,24 @@ namespace resolver {
 /**
  * Exception for failed name resolutions.
  */
-class NameResolutionFailure : std::exception {
-public:
-    const char *what() const noexcept override {
-        return "use of undefined name";
-    }
-};
+CQASM_ANALYSIS_ERROR(NameResolutionFailure);
 
 /**
  * Exception for failed overload resolutions.
  */
-class OverloadResolutionFailure : std::exception {
-public:
-    const char *what() const noexcept override {
-        return "overload resolution failure";
-    }
-};
+CQASM_ANALYSIS_ERROR(OverloadResolutionFailure);
 
 /**
  * Exception for when an instruction that cannot be used conditionally is used
  * conditionally.
  */
-class ConditionalExecutionNotSupported : std::exception {
-public:
-    const char *what() const noexcept override {
-        return "conditional execution is not supported for this instruction";
-    }
-};
+CQASM_ANALYSIS_ERROR(ConditionalExecutionNotSupported);
 
 /**
  * Exception for when an instruction that cannot be used conditionally is used
  * conditionally.
  */
-class QubitsNotUnique : std::exception {
-public:
-    const char *what() const noexcept override {
-        return "conditional execution is not supported for this instruction";
-    }
-};
+CQASM_ANALYSIS_ERROR(QubitsNotUnique);
 
 /**
  * Table of all mappings within a certain scope.
@@ -91,6 +72,8 @@ private:
     std::unique_ptr<OverloadedNameResolver<FunctionImpl>> resolver;
 public:
 
+    // The following things *are all default*. Unfortunately, the compiler
+    // can't infer them because OverloadedNameResolver is incomplete.
     FunctionTable();
     ~FunctionTable();
     FunctionTable(const FunctionTable& t);
@@ -126,6 +109,8 @@ private:
     std::unique_ptr<OverloadedNameResolver<error_model::ErrorModel>> resolver;
 public:
 
+    // The following things *are all default*. Unfortunately, the compiler
+    // can't infer them because OverloadedNameResolver is incomplete.
     ErrorModelTable();
     ~ErrorModelTable();
     ErrorModelTable(const ErrorModelTable& t);
@@ -157,6 +142,8 @@ private:
     std::unique_ptr<OverloadedNameResolver<instruction::Instruction>> resolver;
 public:
 
+    // The following things *are all default*. Unfortunately, the compiler
+    // can't infer them because OverloadedNameResolver is incomplete.
     InstructionTable();
     ~InstructionTable();
     InstructionTable(const InstructionTable& t);

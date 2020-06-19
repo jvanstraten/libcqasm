@@ -45,7 +45,19 @@ bool Instruction::operator==(const Instruction& rhs) const {
 /**
  * Stream << overload for instructions.
  */
-std::ostream& operator<<(std::ostream& os, const ::cqasm::instruction::Instruction& model) {
-    os << model.name << model.param_types;
+std::ostream& operator<<(std::ostream& os, const ::cqasm::instruction::Instruction& insn) {
+    os << insn.name << insn.param_types;
+    return os;
+}
+
+/**
+ * Stream << overload for instruction references.
+ */
+std::ostream& operator<<(std::ostream& os, const ::cqasm::instruction::InstructionRef& insn) {
+    if (insn) {
+        os << *insn;
+    } else {
+        os << "unresolved";
+    }
     return os;
 }

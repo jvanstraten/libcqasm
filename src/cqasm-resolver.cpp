@@ -1,5 +1,6 @@
 #include <unordered_set>
 #include "cqasm-resolver.hpp"
+#include "cqasm-error.hpp"
 
 namespace cqasm {
 namespace resolver {
@@ -34,7 +35,7 @@ void MappingTable::add(const std::string &name, const Value &value) {
 Value MappingTable::resolve(const std::string &name) const {
     auto entry = table.find(lowercase(name));
     if (entry == table.end()) {
-        throw NameResolutionFailure();
+        throw NameResolutionFailure("failed to resolve " + name);
     } else {
         return Value(entry->second->clone());
     }
@@ -130,7 +131,7 @@ public:
                 return std::pair<T, Values>(overload.get_tag(), promoted_args);
             }
         }
-        throw OverloadResolutionFailure();
+        throw OverloadResolutionFailure("failed to resolve overload");
     }
 
 };
@@ -178,23 +179,34 @@ public:
         std::string name_lower = lowercase(name);
         auto entry = table.find(name_lower);
         if (entry == table.end()) {
-            throw NameResolutionFailure();
+            throw NameResolutionFailure("failed to resolve " + name);
         } else {
-            return entry->second.resolve(args);
+            try {
+                return entry->second.resolve(args);
+            } catch (OverloadResolutionFailure &e) {
+                e.message.clear();
+                e.message << "failed to resolve overload for " << name;
+                e.message << "with argument pack " << values::types_of(args);
+                throw;
+            }
         }
     }
 
 };
 
+// The following things *are all default*. Unfortunately, the compiler
+// can't infer them because OverloadedNameResolver is incomplete.
 FunctionTable::FunctionTable() : resolver(new OverloadedNameResolver<FunctionImpl>()) {}
 FunctionTable::~FunctionTable() {}
 FunctionTable::FunctionTable(const FunctionTable& t) : resolver(new OverloadedNameResolver<FunctionImpl>(*t.resolver)) {}
 FunctionTable::FunctionTable(FunctionTable&& t) : resolver(std::move(t.resolver)) {}
 FunctionTable& FunctionTable::operator=(const FunctionTable& t) {
     resolver = std::unique_ptr<OverloadedNameResolver<FunctionImpl>>(new OverloadedNameResolver<FunctionImpl>(*t.resolver));
+    return *this;
 }
 FunctionTable& FunctionTable::operator=(FunctionTable&& t) {
     resolver = std::move(t.resolver);
+    return *this;
 }
 
 /**
@@ -226,15 +238,19 @@ Value FunctionTable::call(const std::string &name, const Values &args) const {
 
 }
 
+// The following things *are all default*. Unfortunately, the compiler
+// can't infer them because OverloadedNameResolver is incomplete.
 ErrorModelTable::ErrorModelTable() : resolver(new OverloadedNameResolver<error_model::ErrorModel>()) {}
 ErrorModelTable::~ErrorModelTable() {}
 ErrorModelTable::ErrorModelTable(const ErrorModelTable& t) : resolver(new OverloadedNameResolver<error_model::ErrorModel>(*t.resolver)) {}
 ErrorModelTable::ErrorModelTable(ErrorModelTable&& t) : resolver(std::move(t.resolver)) {}
 ErrorModelTable& ErrorModelTable::operator=(const ErrorModelTable& t) {
     resolver = std::unique_ptr<OverloadedNameResolver<error_model::ErrorModel>>(new OverloadedNameResolver<error_model::ErrorModel>(*t.resolver));
+    return *this;
 }
 ErrorModelTable& ErrorModelTable::operator=(ErrorModelTable&& t) {
     resolver = std::move(t.resolver);
+    return *this;
 }
 
 /**
@@ -254,21 +270,25 @@ void ErrorModelTable::add(const error_model::ErrorModel &type) {
 semantic::ErrorModel ErrorModelTable::resolve(const std::string &name, const Values &args) const {
     auto resolved = resolver->resolve(name, args);
     return semantic::ErrorModel(
-        resolved.first,
+        tree::make<error_model::ErrorModel>(resolved.first),
         name,
         resolved.second,
         tree::Any<semantic::AnnotationData>());
 }
 
+// The following things *are all default*. Unfortunately, the compiler
+// can't infer them because OverloadedNameResolver is incomplete.
 InstructionTable::InstructionTable() : resolver(new OverloadedNameResolver<instruction::Instruction>()) {}
 InstructionTable::~InstructionTable() {}
 InstructionTable::InstructionTable(const InstructionTable& t) : resolver(new OverloadedNameResolver<instruction::Instruction>(*t.resolver)) {}
 InstructionTable::InstructionTable(InstructionTable&& t) : resolver(std::move(t.resolver)) {}
 InstructionTable& InstructionTable::operator=(const InstructionTable& t) {
     resolver = std::unique_ptr<OverloadedNameResolver<instruction::Instruction>>(new OverloadedNameResolver<instruction::Instruction>(*t.resolver));
+    return *this;
 }
 InstructionTable& InstructionTable::operator=(InstructionTable&& t) {
     resolver = std::move(t.resolver);
+    return *this;
 }
 
 /**
@@ -314,7 +334,9 @@ tree::Maybe<semantic::Instruction> InstructionTable::resolve(
             if (auto x = arg->as_qubit_refs()) {
                 for (auto index : x->index) {
                     if (!qubits_used.insert(index).second) {
-                        throw QubitsNotUnique();
+                        throw QubitsNotUnique(
+                            "qubit with index " + std::to_string(index)
+                            + " is used more than once");
                     }
                 }
             }
@@ -325,7 +347,8 @@ tree::Maybe<semantic::Instruction> InstructionTable::resolve(
     Value res_condition;
     if (condition) {
         if (!insn.allow_conditional) {
-            throw ConditionalExecutionNotSupported();
+            throw ConditionalExecutionNotSupported(
+                "conditional execution is not supported for this instruction");
         }
         res_condition = values::promote(condition, tree::make<types::Bool>());
         if (auto x = res_condition->as_const_bool()) {
@@ -339,7 +362,8 @@ tree::Maybe<semantic::Instruction> InstructionTable::resolve(
 
     // Construct the bound instruction node.
     return tree::make<semantic::Instruction>(
-        insn, name, res_condition, res_args,
+        tree::make<instruction::Instruction>(resolved.first),
+        name, res_condition, res_args,
         tree::Any<semantic::AnnotationData>());
 }
 

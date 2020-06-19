@@ -23,7 +23,7 @@ namespace error_model {
  * from this error model structure to your own internal structure if you're
  * okay with using this one.
  */
-class ErrorModel : public annotatable::Annotatable {
+class ErrorModel : public tree::Base {
 public:
 
     /**
@@ -57,6 +57,11 @@ public:
 
 };
 
+/**
+ * Optional reference to an error model, used within the semantic tree.
+ */
+using ErrorModelRef = tree::Maybe<ErrorModel>;
+
 } // namespace error_model
 } // namespace cqasm
 
@@ -64,3 +69,8 @@ public:
  * Stream << overload for error models.
  */
 std::ostream& operator<<(std::ostream& os, const ::cqasm::error_model::ErrorModel& model);
+
+/**
+ * Stream << overload for error model references.
+ */
+std::ostream& operator<<(std::ostream& os, const ::cqasm::error_model::ErrorModelRef& model);

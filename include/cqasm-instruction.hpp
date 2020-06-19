@@ -27,7 +27,7 @@ namespace instruction {
  * from this error model structure to your own internal structure if you're
  * okay with using this one.
  */
-class Instruction : public annotatable::Annotatable {
+class Instruction : public tree::Base {
 public:
 
     /**
@@ -92,10 +92,20 @@ public:
 
 };
 
+/**
+ * Optional reference to an instruction, used within the semantic tree.
+ */
+using InstructionRef = tree::Maybe<Instruction>;
+
 } // namespace instruction
 } // namespace cqasm
 
 /**
  * Stream << overload for instructions.
  */
-std::ostream& operator<<(std::ostream& os, const ::cqasm::instruction::Instruction& model);
+std::ostream& operator<<(std::ostream& os, const ::cqasm::instruction::Instruction& insn);
+
+/**
+ * Stream << overload for instruction references.
+ */
+std::ostream& operator<<(std::ostream& os, const ::cqasm::instruction::InstructionRef& insn);

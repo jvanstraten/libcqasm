@@ -4,7 +4,7 @@
  * The different kinds of nodes in a structured tree are represented by
  * different class types in C++. Inheritance is used for
  * specialized/generalized types, for example for the relation between an
- * expression and a binary operator; a binary operator is a speciailization of
+ * expression and a binary operator; a binary operator is a specialization of
  * an expression, so it derives from the expression node class. All node types
  * should ultimately inherit from `Base`.
  *
@@ -48,9 +48,9 @@ namespace cqasm {
 namespace tree {
 
 /**
- * Base class for all tree nodes.
+ * Interface class for all tree nodes and the Maybe/One/Any/Many containers.
  */
-class Base : public annotatable::Annotatable {
+class Completable {
 public:
 
     /**
@@ -63,10 +63,16 @@ public:
 };
 
 /**
+ * Base class for all tree nodes.
+ */
+class Base : public annotatable::Annotatable, public Completable {
+};
+
+/**
  * Convenience class for a reference to an optional AST node.
  */
 template <class T>
-class Maybe : public Base {
+class Maybe : public Completable {
 protected:
 
     /**
@@ -377,7 +383,7 @@ One<T> make(Args... args) {
  * Convenience class for zero or more AST nodes.
  */
 template <class T>
-class Any : public Base {
+class Any : public Completable {
 protected:
 
     /**

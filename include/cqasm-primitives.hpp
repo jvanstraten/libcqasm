@@ -9,29 +9,49 @@ namespace cqasm {
 namespace primitives {
 
 /**
+ * Generates a default value for the given primitive type. This is specialized
+ * for the primitives mapping to builtin types (int, bool, etc, for which the
+ * "constructor" doesn't initialize the value at all) such that they actually
+ * initialize with a sane default. Used in the default constructors of the
+ * generated tree nodes to ensure that there's no garbage in the nodes.
+ */
+template <class T>
+T initialize() { return T(); };
+
+/**
  * String primitive used within the AST and semantic trees.
  */
 using Str = std::string;
+template <>
+Str initialize<Str>();
 
 /**
- * Boolean primitive used within the semantic trees.
+ * Boolean primitive used within the semantic trees. Defaults to false.
  */
 using Bool = bool;
+template <>
+Bool initialize<Bool>();
 
 /**
- * Axis primitive used within the semantic trees.
+ * Axis primitive used within the semantic trees. Defaults to X.
  */
-enum Axis { X, Y, Z };
+enum class Axis { X, Y, Z };
+template <>
+Axis initialize<Axis>();
 
 /**
  * Integer primitive used within the AST and semantic trees.
  */
 using Int = std::int64_t;
+template <>
+Int initialize<Int>();
 
 /**
  * Real number primitive used within the AST and semantic trees.
  */
 using Real = double;
+template <>
+Real initialize<Real>();
 
 /**
  * Complex number primitive used within the semantic trees.
@@ -49,17 +69,31 @@ private:
     size_t ncols;
 public:
     /**
+     * Creates an empty matrix.
+     */
+    Matrix()
+        : data(ncols), nrows(1), ncols(0)
+    {}
+
+    /**
+     * Creates a vector.
+     */
+    Matrix(size_t ncols)
+        : data(ncols), nrows(1), ncols(ncols)
+    {}
+
+    /**
      * Creates a zero-initialized matrix of the given size.
      */
     Matrix(size_t nrows, size_t ncols)
-            : data(nrows*ncols), nrows(nrows), ncols(ncols)
+        : data(nrows*ncols), nrows(nrows), ncols(ncols)
     {}
 
     /**
      * Creates a column vector with the given data.
      */
     Matrix(const std::vector<T> &data)
-            : data(data), nrows(data.size()), ncols(1)
+        : data(data), nrows(data.size()), ncols(1)
     {}
 
     /**
@@ -68,7 +102,7 @@ public:
      * range error is thrown.
      */
     Matrix(const std::vector<T> &data, size_t ncols)
-            : data(data), nrows(data.size() / ncols), ncols(ncols)
+        : data(data), nrows(data.size() / ncols), ncols(ncols)
     {
         if (data.size() % ncols != 0) {
             throw std::range_error("invalid matrix shape");

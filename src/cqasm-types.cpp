@@ -7,9 +7,10 @@ namespace types {
  * Constructs a set of types from a shorthand string representation. In it,
  * each character represents one type. The supported characters are as follows:
  *
- *  - q = qubit
- *  - a = axis (x, y, or z)
+ *  - Q = qubit
+ *  - B = assignable bit/boolean (measurement register)
  *  - b = bit/boolean
+ *  - a = axis (x, y, or z)
  *  - i = integer
  *  - r = real
  *  - c = complex
@@ -17,6 +18,9 @@ namespace types {
  *        the parameter list (automatically deduced)
  *  - s = (quoted) string
  *  - j = json
+ *
+ * In general, lowercase means the parameter is only read and can thus be a
+ * constant, while uppercase means it is mutated.
  *
  * Note that complex matrices with different constraints and real matrices of
  * any kind cannot be specified this way. You'll have to construct and add
@@ -26,7 +30,7 @@ Types from_spec(const std::string &spec) {
     // Count the number of qubits, in case we find a unitary parameter.
     size_t num_qubits = 0;
     for (auto c : spec) {
-        if (c == 'q') {
+        if (c == 'Q') {
             num_qubits += 1;
         }
     }
@@ -34,34 +38,38 @@ Types from_spec(const std::string &spec) {
     // Now resolve the types.
     Types types;
     for (auto c : spec) {
-        switch (c) {
+        bool assignable = std::tolower(c) != (int)c;
+        switch (std::tolower(c)) {
             case 'q':
-                types.add_raw(new types::Qubit());
+                if (!assignable) {
+                    throw std::invalid_argument("use uppercase Q for qubits");
+                }
+                types.add_raw(new types::Qubit(true));
                 break;
             case 'a':
-                types.add_raw(new types::Axis());
+                types.add_raw(new types::Axis(assignable));
                 break;
             case 'b':
-                types.add_raw(new types::Bool());
+                types.add_raw(new types::Bool(assignable));
                 break;
             case 'i':
-                types.add_raw(new types::Int());
+                types.add_raw(new types::Int(assignable));
                 break;
             case 'r':
-                types.add_raw(new types::Real());
+                types.add_raw(new types::Real(assignable));
                 break;
             case 'c':
-                types.add_raw(new types::Complex());
+                types.add_raw(new types::Complex(assignable));
                 break;
             case 'u':
                 types.add_raw(new types::ComplexMatrix(
-                    1ull << num_qubits, 1ull << num_qubits));
+                    1ull << num_qubits, 1ull << num_qubits, assignable));
                 break;
             case 's':
-                types.add_raw(new types::String());
+                types.add_raw(new types::String(assignable));
                 break;
             case 'j':
-                types.add_raw(new types::Json());
+                types.add_raw(new types::Json(assignable));
                 break;
             default:
                 throw std::invalid_argument("unknown type code encountered");

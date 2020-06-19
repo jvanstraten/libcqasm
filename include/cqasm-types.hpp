@@ -8,12 +8,12 @@ namespace types {
 /**
  * A cQASM type.
  */
-using Type = tree::One<Node>;
+using Type = tree::One<TypeBase>;
 
 /**
  * Zero or more cQASM types.
  */
-using Types = tree::Any<Node>;
+using Types = tree::Any<TypeBase>;
 
 /**
  * Constructs a set of types from a shorthand string representation. In it,

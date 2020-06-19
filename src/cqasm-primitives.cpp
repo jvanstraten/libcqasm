@@ -1,5 +1,26 @@
 #include "cqasm-primitives.hpp"
 
+namespace cqasm {
+namespace primitives {
+
+template <>
+Str initialize<Str>() { return ""; }
+
+template <>
+Bool initialize<Bool>() { return false; }
+
+template <>
+Axis initialize<Axis>() { return Axis::X; }
+
+template <>
+Int initialize<Int>() { return 0; }
+
+template <>
+Real initialize<Real>() { return 0.0; }
+
+} // namespace primitives
+} // namespace cqasm
+
 /**
  * Stream << overload for axis nodes.
  */

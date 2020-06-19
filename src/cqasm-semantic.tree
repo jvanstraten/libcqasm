@@ -47,7 +47,7 @@ annotated {
     error_model {
 
         # Error model type as registered through the API.
-        model: cqasm::error_model::ErrorModel;
+        model: cqasm::error_model::ErrorModelRef;
 
         # Name as it appears in the cQASM file.
         name: cqasm::primitives::Str;
@@ -61,7 +61,7 @@ annotated {
     instruction {
 
         # Instruction type as registered through the API.
-        instruction: cqasm::instruction::Instruction;
+        instruction: cqasm::instruction::InstructionRef;
 
         # Name as it appears in the cQASM file.
         name: cqasm::primitives::Str;

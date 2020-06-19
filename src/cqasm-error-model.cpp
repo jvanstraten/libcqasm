@@ -37,3 +37,15 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::error_model::ErrorMode
     os << model.name << model.param_types;
     return os;
 }
+
+/**
+ * Stream << overload for error model references.
+ */
+std::ostream& operator<<(std::ostream& os, const ::cqasm::error_model::ErrorModelRef& model) {
+    if (model) {
+        os << *model;
+    } else {
+        os << "unresolved";
+    }
+    return os;
+}

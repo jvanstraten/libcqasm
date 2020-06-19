@@ -25,6 +25,16 @@ using Values = tree::Any<Node>;
  */
 Value promote(const Value &value, const types::Type &type);
 
+/**
+ * Returns the type of the given value.
+ */
+types::Type type_of(const Value &value);
+
+/**
+ * Returns the types of the given values.
+ */
+types::Types types_of(const Values &values);
+
 } // namespace values
 } // namespace cqasm
 
