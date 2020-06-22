@@ -33,7 +33,7 @@ annotation_data {
     operation: cqasm::primitives::Str;
 
     # Any operands attached to the annotation.
-    operands: cqasm::values::Values;
+    operands: external Any<cqasm::values::Node>;
 
 }
 
@@ -53,7 +53,7 @@ annotated {
         name: cqasm::primitives::Str;
 
         # Error model parameters.
-        parameters: cqasm::values::Values;
+        parameters: external Any<cqasm::values::Node>;
 
     }
 
@@ -68,10 +68,10 @@ annotated {
 
         # Condition (c- notation). When there is no condition, this is a
         # constant boolean set to true.
-        condition: cqasm::values::Value;
+        condition: external One<cqasm::values::Node>;
 
         # Operands for the instruction.
-        operands: cqasm::values::Values;
+        operands: external Any<cqasm::values::Node>;
 
     }
 

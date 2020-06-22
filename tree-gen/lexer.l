@@ -67,6 +67,9 @@ One                                                 WITHOUT_STR(ONE);
 Any                                                 WITHOUT_STR(ANY);
 Many                                                WITHOUT_STR(MANY);
 
+    /* External node (typedef'd multiplicity thing from another tree) */
+external                                            WITHOUT_STR(EXT);
+
     /* Identifiers */
 [_a-zA-Z][_a-zA-Z0-9]*                              WITH_STR(IDENT);
 

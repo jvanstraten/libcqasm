@@ -68,7 +68,7 @@
 %token SOURCE HEADER TREE_NS SOURCE_LOC
 %token NAMESPACE NAMESPACE_SEP
 %token ERROR
-%token MAYBE ONE ANY MANY
+%token MAYBE ONE ANY MANY EXT
 %token <str> IDENT
 %token <str> STRING
 %token '{' '}' '<' '>' ':' ';'
@@ -97,7 +97,11 @@ Node            : Documentation IDENT '{'                                       
                 | Node Documentation IDENT ':' ONE '<' Identifier '>' ';'       { TRY $$ = $1->with_child(One, *$7, std::string($3), *$2); delete $2; std::free($3); delete $7; CATCH }
                 | Node Documentation IDENT ':' ANY '<' Identifier '>' ';'       { TRY $$ = $1->with_child(Any, *$7, std::string($3), *$2); delete $2; std::free($3); delete $7; CATCH }
                 | Node Documentation IDENT ':' MANY '<' Identifier '>' ';'      { TRY $$ = $1->with_child(Many, *$7, std::string($3), *$2); delete $2; std::free($3); delete $7; CATCH }
-                | Node Documentation IDENT ':' Identifier ';'                   { TRY $$ = $1->with_prim(*$5, std::string($3), *$2); delete $2; std::free($3); delete $5; CATCH }
+                | Node Documentation IDENT ':' EXT MAYBE '<' Identifier '>' ';' { TRY $$ = $1->with_prim(*$8, std::string($3), *$2, Maybe); delete $2; std::free($3); delete $8; CATCH }
+                | Node Documentation IDENT ':' EXT ONE '<' Identifier '>' ';'   { TRY $$ = $1->with_prim(*$8, std::string($3), *$2, One); delete $2; std::free($3); delete $8; CATCH }
+                | Node Documentation IDENT ':' EXT ANY '<' Identifier '>' ';'   { TRY $$ = $1->with_prim(*$8, std::string($3), *$2, Any); delete $2; std::free($3); delete $8; CATCH }
+                | Node Documentation IDENT ':' EXT MANY '<' Identifier '>' ';'  { TRY $$ = $1->with_prim(*$8, std::string($3), *$2, Many); delete $2; std::free($3); delete $8; CATCH }
+                | Node Documentation IDENT ':' Identifier ';'                   { TRY $$ = $1->with_prim(*$5, std::string($3), *$2, Prim); delete $2; std::free($3); delete $5; CATCH }
                 | Node Node '}'                                                 { TRY $2->derive_from($1->node); CATCH }
                 ;
 

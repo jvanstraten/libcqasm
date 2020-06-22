@@ -75,6 +75,13 @@ struct ChildNode {
      */
     std::string doc;
 
+    /**
+     * External node type. This is valid when `type` is Prim. If this is Prim
+     * as well, then it's actually a primitive, otherwise it's a node from
+     * another tree. This is kind of a kludge for having the dumper class
+     * properly handle indentation here; that's the only place it's used.
+     */
+    ChildType ext_type;
 };
 
 /**
@@ -189,6 +196,7 @@ public:
         child.prim_type = node_name;
         child.name = name;
         child.doc = doc;
+        child.ext_type = type;
         node->children.push_back(std::move(child));
         return this;
     }
@@ -199,13 +207,21 @@ public:
     NodeBuilder *with_prim(
         const std::string &prim,
         const std::string &name,
-        const std::string &doc = ""
+        const std::string &doc = "",
+        ChildType type = Prim
     ) {
         auto child = ChildNode();
         child.type = Prim;
-        child.prim_type = prim;
+        switch (type) {
+            case Maybe: child.prim_type = "Maybe<" + prim + ">"; break;
+            case One:   child.prim_type = "One<" + prim + ">"; break;
+            case Any:   child.prim_type = "Any<" + prim + ">"; break;
+            case Many:  child.prim_type = "Many<" + prim + ">"; break;
+            default:    child.prim_type = prim; break;
+        }
         child.name = name;
         child.doc = doc;
+        child.ext_type = type;
         node->children.push_back(std::move(child));
         return this;
     }

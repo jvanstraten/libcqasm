@@ -152,10 +152,10 @@ static void generate_base_class(
     header << "    virtual void visit(Visitor &visitor) = 0;" << std::endl << std::endl;
 
     format_doc(header, "Writes a debug dump of this node to the given stream.", "    ");
-    header << "    void dump(std::ostream &out=std::cout);" << std::endl << std::endl;
+    header << "    void dump(std::ostream &out=std::cout, int indent=0);" << std::endl << std::endl;
     format_doc(source, "Writes a debug dump of this node to the given stream.");
-    source << "void Node::dump(std::ostream &out) {" << std::endl;
-    source << "    auto dumper = Dumper(out);" << std::endl;
+    source << "void Node::dump(std::ostream &out, int indent) {" << std::endl;
+    source << "    auto dumper = Dumper(out, indent);" << std::endl;
     source << "    visit(dumper);" << std::endl;
     source << "}" << std::endl << std::endl;
 
@@ -503,7 +503,7 @@ static void generate_dumper_class(
     // Write constructor.
     header << "public:" << std::endl << std::endl;
     format_doc(header, "Construct a dumping visitor.", "    ");
-    header << "    Dumper(std::ostream &out) : out(out) {};" << std::endl << std::endl;
+    header << "    Dumper(std::ostream &out, int indent=0) : out(out), indent(indent) {};" << std::endl << std::endl;
 
     // Print fallback function.
     format_doc(header, "Dumps a `Node`.", "    ");
@@ -541,7 +541,7 @@ static void generate_dumper_class(
             for (auto &child : children) {
                 source << "    write_indent();" << std::endl;
                 source << "    out << \"" << child.name << ": \";" << std::endl;
-                switch (child.type) {
+                switch (child.ext_type) {
                     case Maybe:
                     case One:
                         source << "    if (node." << child.name << ".empty()) {" << std::endl;
@@ -553,7 +553,13 @@ static void generate_dumper_class(
                         source << "    } else {" << std::endl;
                         source << "        out << \"<\" << std::endl;" << std::endl;
                         source << "        indent++;" << std::endl;
-                        source << "        node." << child.name << ".visit(*this);" << std::endl;
+                        if (child.type == Prim) {
+                            source << "        if (node." << child.name << ") {" << std::endl;
+                            source << "            node." << child.name << "->dump(out, indent);" << std::endl;
+                            source << "        }" << std::endl;
+                        } else {
+                            source << "        node." << child.name << ".visit(*this);" << std::endl;
+                        }
                         source << "        indent--;" << std::endl;
                         source << "        write_indent();" << std::endl;
                         source << "        out << \">\" << std::endl;" << std::endl;
@@ -573,7 +579,11 @@ static void generate_dumper_class(
                         source << "        indent++;" << std::endl;
                         source << "        for (auto &sptr : node." << child.name << ") {" << std::endl;
                         source << "            if (sptr) {" << std::endl;
-                        source << "                sptr->visit(*this);" << std::endl;
+                        if (child.type == Prim) {
+                            source << "                sptr->dump(out, indent);" << std::endl;
+                        } else {
+                            source << "                sptr->visit(*this);" << std::endl;
+                        }
                         source << "            } else {" << std::endl;
                         source << "                write_indent();" << std::endl;
                         source << "                out << \"!NULL\" << std::endl;" << std::endl;
