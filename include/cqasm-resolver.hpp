@@ -21,18 +21,6 @@ CQASM_ANALYSIS_ERROR(NameResolutionFailure);
 CQASM_ANALYSIS_ERROR(OverloadResolutionFailure);
 
 /**
- * Exception for when an instruction that cannot be used conditionally is used
- * conditionally.
- */
-CQASM_ANALYSIS_ERROR(ConditionalExecutionNotSupported);
-
-/**
- * Exception for when an instruction that cannot be used conditionally is used
- * conditionally.
- */
-CQASM_ANALYSIS_ERROR(QubitsNotUnique);
-
-/**
  * Table of all mappings within a certain scope.
  */
 class MappingTable {
@@ -130,7 +118,10 @@ public:
      * model node. Annotation data and line number information still needs to
      * be set by the caller.
      */
-    semantic::ErrorModel resolve(const std::string &name, const values::Values &args) const;
+    tree::One<semantic::ErrorModel> resolve(
+        const std::string &name,
+        const values::Values &args
+    ) const;
 
 };
 
@@ -160,13 +151,13 @@ public:
      * Resolves an instruction. Throws NameResolutionFailure if no instruction
      * by the given name exists, OverloadResolutionFailure if no overload
      * exists for the given arguments, or otherwise returns the resolved
-     * instruction node. Annotation data and line number information still
-     * needs to be set by the caller.
+     * instruction node. Annotation data, line number information, and the
+     * condition still need to be set by the caller.
      */
-    tree::Maybe<semantic::Instruction> resolve(
+    tree::One<semantic::Instruction> resolve(
         const std::string &name,
-        const values::Value &condition,
-        const values::Values &args) const;
+        const values::Values &args
+    ) const;
 
 };
 

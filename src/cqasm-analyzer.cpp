@@ -1,5 +1,7 @@
-#include <cqasm-parse-helper.hpp>
+#include <unordered_set>
 #include "cqasm-analyzer.hpp"
+#include "cqasm-parse-helper.hpp"
+#include "cqasm-utils.hpp"
 
 namespace cqasm {
 namespace analyzer {
@@ -58,6 +60,19 @@ public:
      * error vector, and nothing is added to the subcircuit.
      */
     void analyze_bundle(const ast::Bundle &bundle);
+
+    /**
+     * Analyzes the given instruction. If an error occurs, the message is added to
+     * the result error vector, and an empty Maybe is returned.
+     */
+    tree::Maybe<semantic::Instruction> analyze_instruction(const ast::Instruction &insn);
+
+    /**
+     * Analyzes the error model meta-instruction and, if valid, adds it to the
+     * analysis result. If an error occurs, the message is added to the result
+     * error vector, and nothing is added.
+     */
+    void analyze_error_model(const ast::Instruction &insn);
 
     /**
      * Analyzes the given mapping and, if valid, adds it to the current
@@ -263,7 +278,192 @@ void AnalyzerHelper::analyze_qubits(const ast::Expression &count) {
  * error vector, and nothing is added to the subcircuit.
  */
 void AnalyzerHelper::analyze_bundle(const ast::Bundle &bundle) {
-    // TODO
+    try {
+
+        // The error model statement from the original cQASM grammar is a bit
+        // of a pain, because it conflicts with gates/instructions, so we have
+        // to special-case it here. Technically we could also have made it a
+        // keyword, but the less random keywords there are, the better.
+        if (bundle.items.size() == 1) {
+            if (utils::case_insensitive_equals(bundle.items[0]->name->name, "error_model")) {
+                analyze_error_model(*bundle.items[0]);
+                return;
+            }
+        }
+
+        // Analyze and add the instructions.
+        auto node = tree::make<semantic::Bundle>();
+        for (const auto &insn : bundle.items) {
+            node->items.add(analyze_instruction(*insn));
+        }
+
+        // It's possible that no instructions end up being added, due to all
+        // condition codes resolving to constant false. In that case the entire
+        // bundle is removed.
+        if (node->items.empty()) {
+            return;
+        }
+
+        // Copy annotation data.
+        node->annotations = analyze_annotations(bundle.annotations);
+        node->copy_annotation<parser::SourceLocation>(bundle);
+
+        // If we don't have a subcircuit yet, add a default one. Note that the
+        // original libqasm always had this default subcircuit (even if it was
+        // empty) and used the name "default" vs. the otherwise invalid empty
+        // string.
+        if (result.root->subcircuits.empty()) {
+            auto node = tree::make<semantic::Subcircuit>("", 1);
+            node->copy_annotation<parser::SourceLocation>(bundle);
+            result.root->subcircuits.add(node);
+        }
+
+        // Add the node to the last subcircuit.
+        result.root->subcircuits.back()->bundles.add(node);
+
+    } catch (error::AnalysisError &e) {
+        e.context(bundle);
+        result.errors.push_back(e.get_message());
+    }
+}
+
+/**
+ * Analyzes the given instruction. If an error occurs, the message is added to
+ * the result error vector, and an empty Maybe is returned. It's also possible
+ * that an empty Maybe is returned without an error, when the condition code
+ * statically resolves to false.
+ */
+tree::Maybe<semantic::Instruction> AnalyzerHelper::analyze_instruction(const ast::Instruction &insn) {
+    try {
+
+        // Figure out the operand list.
+        auto operands = values::Values();
+        for (auto operand_expr : insn.operands->items) {
+            operands.add(analyze_expression(*operand_expr));
+        }
+
+        // Resolve the instruction and/or make the instruction node.
+        tree::Maybe<semantic::Instruction> node;
+        if (analyzer.resolve_instructions) {
+            node.set(scope.instruction_set.resolve(insn.name->name, operands));
+        } else {
+            node.set(tree::make<semantic::Instruction>(
+                tree::Maybe<instruction::Instruction>(),
+                insn.name->name, values::Value(), operands,
+                tree::Any<semantic::AnnotationData>()));
+        }
+
+        // Resolve the condition code.
+        if (insn.condition) {
+            if (node->instruction && !node->instruction->allow_conditional) {
+                throw error::AnalysisError(
+                    "conditional execution is not supported for this instruction");
+            }
+            auto condition_val = analyze_expression(*insn.condition);
+            node->condition = values::promote(condition_val, tree::make<types::Bool>());
+
+            // If the condition is constant false, optimize the instruction
+            // away.
+            if (auto x = node->condition->as_const_bool()) {
+                if (!x->value) {
+                    return tree::Maybe<semantic::Instruction>();
+                }
+            }
+
+        } else {
+            node->condition.set(tree::make<values::ConstBool>(true));
+        }
+
+        // Enforce qubit uniqueness if the instruction requires us to.
+        if (node->instruction && !node->instruction->allow_reused_qubits) {
+            std::unordered_set<primitives::Int> qubits_used;
+            for (const auto &operand : operands) {
+                if (auto x = operand->as_qubit_refs()) {
+                    for (auto index : x->index) {
+                        if (!qubits_used.insert(index).second) {
+                            throw error::AnalysisError(
+                                "qubit with index " + std::to_string(index)
+                                + " is used more than once");
+                        }
+                    }
+                }
+            }
+        }
+
+        // Copy annotation data.
+        node->annotations = analyze_annotations(insn.annotations);
+        node->copy_annotation<parser::SourceLocation>(insn);
+
+        return node;
+    } catch (error::AnalysisError &e) {
+        e.context(insn);
+        result.errors.push_back(e.get_message());
+    }
+    return tree::Maybe<semantic::Instruction>();
+}
+
+/**
+ * Analyzes the error model meta-instruction and, if valid, adds it to the
+ * analysis result. If an error occurs, the message is added to the result
+ * error vector, and nothing is added.
+ */
+void AnalyzerHelper::analyze_error_model(const ast::Instruction &insn) {
+    try {
+
+        // Only one error model should be specified, so throw an error
+        // if we already have one.
+        if (!result.root->error_model.empty()) {
+            auto ss = std::ostringstream();
+            ss << "error model can only be specified once";
+            if (auto loc = result.root->error_model->get_annotation_ptr<parser::SourceLocation>()) {
+                ss << ", previous specification was at " << *loc;
+            }
+            throw error::AnalysisError(ss.str());
+        }
+
+        // Figure out the name of the error model.
+        const auto &arg_exprs = insn.operands->items;
+        if (arg_exprs.size() < 1) {
+            throw error::AnalysisError("missing error model name");
+        }
+        std::string name;
+        if (auto name_ident = arg_exprs[0]->as_identifier()) {
+            name = name_ident->name;
+        } else {
+            throw error::AnalysisError(
+                "first argument of an error model must be its name as an identifier");
+        }
+
+        // Figure out the argument list.
+        auto arg_values = values::Values();
+        for (auto arg_expr_it = arg_exprs.begin() + 1; arg_expr_it < arg_exprs.end(); arg_expr_it++) {
+            arg_values.add(analyze_expression(**arg_expr_it));
+        }
+
+        // Resolve the error model to one of the known models if
+        // requested. If resolving is disabled, just make a node with
+        // the name and values directly (without promotion/implicit
+        // casts).
+        if (analyzer.resolve_error_model) {
+            result.root->error_model.set(
+                analyzer.error_models.resolve(
+                    name, arg_values));
+        } else {
+            result.root->error_model.set(
+                tree::make<semantic::ErrorModel>(
+                    tree::Maybe<error_model::ErrorModel>(),
+                    name, arg_values,
+                    tree::Any<semantic::AnnotationData>()));
+        }
+
+        // Copy annotation data.
+        result.root->error_model->annotations = analyze_annotations(insn.annotations);
+        result.root->error_model->copy_annotation<parser::SourceLocation>(insn);
+
+    } catch (error::AnalysisError &e) {
+        e.context(insn);
+        result.errors.push_back(e.get_message());
+    }
 }
 
 /**
@@ -272,7 +472,12 @@ void AnalyzerHelper::analyze_bundle(const ast::Bundle &bundle) {
  * error vector, and nothing is added to the scope.
  */
 void AnalyzerHelper::analyze_mapping(const ast::Mapping &mapping) {
-    scope.mappings.add(mapping.alias->name, analyze_expression(*mapping.expr));
+    try {
+        scope.mappings.add(mapping.alias->name, analyze_expression(*mapping.expr));
+    } catch (error::AnalysisError &e) {
+        e.context(mapping);
+        result.errors.push_back(e.get_message());
+    }
 }
 
 /**
@@ -281,20 +486,27 @@ void AnalyzerHelper::analyze_mapping(const ast::Mapping &mapping) {
  * error vector, and nothing is added to the result.
  */
 void AnalyzerHelper::analyze_subcircuit(const ast::Subcircuit &subcircuit) {
-    primitives::Int iterations = 1;
-    if (subcircuit.iterations) {
-        iterations = analyze_as_const_int(*subcircuit.iterations);
-        if (iterations < 1) {
-            throw error::AnalysisError(
-                "subcircuit iteration count must be positive, but is"
-                + std::to_string(iterations), &*subcircuit.iterations);
+    try {
+        primitives::Int iterations = 1;
+        if (subcircuit.iterations) {
+            iterations = analyze_as_const_int(*subcircuit.iterations);
+            if (iterations < 1) {
+                throw error::AnalysisError(
+                    "subcircuit iteration count must be positive, but is "
+                    + std::to_string(iterations), &*subcircuit.iterations);
+            }
         }
+        auto node = tree::make<semantic::Subcircuit>(
+            subcircuit.name->name,
+            iterations,
+            tree::Any<semantic::Bundle>(),
+            analyze_annotations(subcircuit.annotations));
+        node->copy_annotation<parser::SourceLocation>(subcircuit);
+        result.root->subcircuits.add(node);
+    } catch (error::AnalysisError &e) {
+        e.context(subcircuit);
+        result.errors.push_back(e.get_message());
     }
-    result.root->subcircuits.add(tree::make<semantic::Subcircuit>(
-        subcircuit.name->name,
-        iterations,
-        tree::Any<semantic::Bundle>(),
-        analyze_annotations(subcircuit.annotations)));
 }
 
 /**
@@ -306,11 +518,23 @@ tree::Any<semantic::AnnotationData> AnalyzerHelper::analyze_annotations(
     const tree::Any<ast::AnnotationData> &annotations
 ) {
     auto retval = tree::Any<semantic::AnnotationData>();
-    for (auto ast : annotations) {
+    for (auto annotation_ast : annotations) {
         try {
-            // TODO
+            auto annotation = tree::make<semantic::AnnotationData>();
+            annotation->interface = annotation_ast->interface->name;
+            annotation->operation = annotation_ast->operation->name;
+            for (auto expression_ast : annotation_ast->operands->items) {
+                try {
+                    annotation->operands.add(analyze_expression(*expression_ast));
+                } catch (error::AnalysisError &e) {
+                    e.context(*annotation_ast);
+                    result.errors.push_back(e.get_message());
+                }
+            }
+            annotation->copy_annotation<parser::SourceLocation>(*annotation_ast);
+            retval.add(annotation);
         } catch (error::AnalysisError &e) {
-            e.context(*ast);
+            e.context(*annotation_ast);
             result.errors.push_back(e.get_message());
         }
     }

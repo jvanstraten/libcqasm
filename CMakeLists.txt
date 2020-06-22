@@ -111,6 +111,7 @@ add_library(
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-resolver.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-parse-helper.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-analyzer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-utils.cpp"
 )
 
 # The src directory and binary directory (for generated header files) are

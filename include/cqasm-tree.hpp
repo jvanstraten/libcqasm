@@ -505,6 +505,18 @@ public:
     }
 
     /**
+     * Returns a copy of the reference to the last value in the list. If the
+     * list is empty, an empty reference is returned.
+     */
+    Maybe<T> back() const {
+        if (vec.empty()) {
+            return Maybe<T>();
+        } else {
+            return vec.back();
+        }
+    }
+
+    /**
      * `begin()` for for-each loops.
      */
     typename std::vector<One<T>>::iterator begin() {

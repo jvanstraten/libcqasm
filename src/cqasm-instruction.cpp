@@ -1,4 +1,5 @@
 #include "cqasm-instruction.hpp"
+#include "cqasm-utils.hpp"
 
 namespace cqasm {
 namespace instruction {
@@ -32,11 +33,11 @@ Instruction::Instruction(
  * Equality operator.
  */
 bool Instruction::operator==(const Instruction& rhs) const {
-    if (name.size() != rhs.name.size()) return false;
-    for (size_t i = 0; i < name.size(); i++) {
-        if (std::tolower(name[i]) != std::tolower(rhs.name[i])) return false;
-    }
-    return param_types == rhs.param_types;
+    return utils::case_insensitive_equals(name, rhs.name)
+            && param_types == rhs.param_types
+            && allow_conditional == rhs.allow_conditional
+            && allow_parallel == rhs.allow_parallel
+            && allow_reused_qubits == rhs.allow_reused_qubits;
 }
 
 } // namespace instruction

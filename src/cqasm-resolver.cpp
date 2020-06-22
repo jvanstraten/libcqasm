@@ -1,6 +1,7 @@
 #include <unordered_set>
 #include "cqasm-resolver.hpp"
 #include "cqasm-error.hpp"
+#include "cqasm-utils.hpp"
 
 namespace cqasm {
 namespace resolver {
@@ -11,21 +12,10 @@ using Value = values::Value;
 using Values = values::Values;
 
 /**
- * Makes a string lowercase.
- */
-std::string lowercase(const std::string &name) {
-    std::string name_lower = name;
-    std::for_each(name_lower.begin(), name_lower.end(), [](char &c){
-        c = std::tolower(c);
-    });
-    return name_lower;
-}
-
-/**
  * Adds a mapping.
  */
 void MappingTable::add(const std::string &name, const Value &value) {
-    table.insert(std::make_pair(lowercase(name), value));
+    table.insert(std::make_pair(utils::lowercase(name), value));
 }
 
 /**
@@ -33,7 +23,7 @@ void MappingTable::add(const std::string &name, const Value &value) {
  * given name exists.
  */
 Value MappingTable::resolve(const std::string &name) const {
-    auto entry = table.find(lowercase(name));
+    auto entry = table.find(utils::lowercase(name));
     if (entry == table.end()) {
         throw NameResolutionFailure("failed to resolve " + name);
     } else {
@@ -156,7 +146,7 @@ public:
      * added first.
      */
     void add_overload(const std::string &name, const T &tag, const Types &param_types) {
-        std::string name_lower = lowercase(name);
+        std::string name_lower = utils::lowercase(name);
         auto entry = table.find(name_lower);
         if (entry == table.end()) {
             auto resolver = OverloadResolver<T>();
@@ -176,7 +166,7 @@ public:
      * appropriately promoted vector of value pointers.
      */
     std::pair<T, Values> resolve(const std::string &name, const Values &args) {
-        std::string name_lower = lowercase(name);
+        std::string name_lower = utils::lowercase(name);
         auto entry = table.find(name_lower);
         if (entry == table.end()) {
             throw NameResolutionFailure("failed to resolve " + name);
@@ -267,9 +257,9 @@ void ErrorModelTable::add(const error_model::ErrorModel &type) {
  * model node. Annotation data and line number information still needs to be
  * set by the caller.
  */
-semantic::ErrorModel ErrorModelTable::resolve(const std::string &name, const Values &args) const {
+tree::One<semantic::ErrorModel> ErrorModelTable::resolve(const std::string &name, const Values &args) const {
     auto resolved = resolver->resolve(name, args);
-    return semantic::ErrorModel(
+    return tree::make<semantic::ErrorModel>(
         tree::make<error_model::ErrorModel>(resolved.first),
         name,
         resolved.second,
@@ -299,71 +289,20 @@ void InstructionTable::add(const instruction::Instruction &type) {
 }
 
 /**
- * Resolves an instruction. This can result in any of the following things:
- *
- *  - There is no registered instruction by the given name. This throws a
- *    NameResolutionFailure.
- *  - The name is known, but there is no overload for the given parameter list.
- *    This throws an OverloadResolutionFailure.
- *  - Conditional execution (c-) notation was used, but the instruction doesn't
- *    support it. This throws a ConditionalExecutionNotSupported.
- *  - One or more qubits are used more than once in the instruction, and the
- *    instruction doesn't support this. This throws a QubitsNotUnique.
- *  - Conditional execution (c-) notation was used and is supported, and the
- *    condition resolves to constant false. In this case, an empty Maybe is
- *    returned.
- *  - The common case: a filled Maybe is returned with the resolved instruction
- *    node. Annotation data and line number information still needs to be
- *    copied from the AST by the caller.
+ * Resolves an instruction. Throws NameResolutionFailure if no instruction
+ * by the given name exists, OverloadResolutionFailure if no overload
+ * exists for the given arguments, or otherwise returns the resolved
+ * instruction node. Annotation data, line number information, and the
+ * condition still need to be set by the caller.
  */
-tree::Maybe<semantic::Instruction> InstructionTable::resolve(
+tree::One<semantic::Instruction> InstructionTable::resolve(
     const std::string &name,
-    const Value &condition,
     const Values &args
 ) const {
-
-    // Resolve the instruction name and overload.
     auto resolved = resolver->resolve(name, args);
-    auto &insn = resolved.first;
-    auto &res_args = resolved.second;
-
-    // Enforce qubit uniqueness if the instruction requires us to.
-    if (!insn.allow_reused_qubits) {
-        std::unordered_set<primitives::Int> qubits_used;
-        for (const auto &arg : res_args) {
-            if (auto x = arg->as_qubit_refs()) {
-                for (auto index : x->index) {
-                    if (!qubits_used.insert(index).second) {
-                        throw QubitsNotUnique(
-                            "qubit with index " + std::to_string(index)
-                            + " is used more than once");
-                    }
-                }
-            }
-        }
-    }
-
-    // Resolve the condition code.
-    Value res_condition;
-    if (condition) {
-        if (!insn.allow_conditional) {
-            throw ConditionalExecutionNotSupported(
-                "conditional execution is not supported for this instruction");
-        }
-        res_condition = values::promote(condition, tree::make<types::Bool>());
-        if (auto x = res_condition->as_const_bool()) {
-            if (!x->value) {
-                return tree::Maybe<semantic::Instruction>();
-            }
-        }
-    } else {
-        res_condition.set(tree::make<values::ConstBool>(true));
-    }
-
-    // Construct the bound instruction node.
     return tree::make<semantic::Instruction>(
         tree::make<instruction::Instruction>(resolved.first),
-        name, res_condition, res_args,
+        name, values::Value(), resolved.second,
         tree::Any<semantic::AnnotationData>());
 }
 
