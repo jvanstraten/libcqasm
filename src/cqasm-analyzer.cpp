@@ -1,10 +1,114 @@
 #include <unordered_set>
+#include <math.h>
 #include "cqasm-analyzer.hpp"
 #include "cqasm-parse-helper.hpp"
 #include "cqasm-utils.hpp"
+#include "cqasm-functions-gen.hpp"
 
 namespace cqasm {
 namespace analyzer {
+
+/**
+ * Creates a new semantic analyzer.
+ */
+Analyzer::Analyzer() : resolve_instructions(false), resolve_error_model(false) {
+}
+
+/**
+ * Registers an initial mapping from the given name to the given value.
+ */
+void Analyzer::register_mapping(const std::string &name, const values::Value &value) {
+    mappings.add(name, value);
+}
+
+/**
+ * Registers a function, usable within expressions.
+ */
+void Analyzer::register_function(
+    const std::string &name,
+    const types::Types &param_types,
+    const resolver::FunctionImpl &impl
+) {
+    functions.add(name, param_types, impl);
+}
+
+/**
+ * Convenience method for registering a function. The param_types are
+ * specified as a string, converted to types::Types for the other overload
+ * using types::from_spec.
+ */
+void Analyzer::register_function(
+    const std::string &name,
+    const std::string &param_types,
+    const resolver::FunctionImpl &impl
+) {
+    functions.add(name, types::from_spec(param_types), impl);
+}
+
+/**
+ * Registers a number of default functions and mappings, such as the
+ * operator functions, the usual trigonometric functions, mappings for pi,
+ * eu (aka e, 2.718...), im (imaginary unit) and so on.
+ */
+void Analyzer::register_default_functions_and_mappings() {
+    register_mapping("x", tree::make<values::ConstAxis>(primitives::Axis::X));
+    register_mapping("y", tree::make<values::ConstAxis>(primitives::Axis::Y));
+    register_mapping("z", tree::make<values::ConstAxis>(primitives::Axis::Z));
+    register_mapping("true", tree::make<values::ConstBool>(true));
+    register_mapping("false", tree::make<values::ConstBool>(false));
+    register_mapping("pi", tree::make<values::ConstReal>(M_PI));
+    register_mapping("eu", tree::make<values::ConstReal>(M_E));
+    register_mapping("im", tree::make<values::ConstComplex>(primitives::Complex(0.0, 1.0)));
+    functions::register_into(functions);
+}
+
+/**
+ * Registers an instruction type. If you never call this, instructions are
+ * not resolved (i.e. anything goes name- and operand type-wise). Once you
+ * do, only instructions with signatures as added are legal, so anything
+ * that doesn't match returns an error.
+ */
+void Analyzer::register_instruction(const instruction::Instruction &instruction) {
+    resolve_instructions = true;
+    instruction_set.add(instruction);
+}
+
+/**
+ * Convenience method for registering an instruction type. The arguments
+ * are passed straight to instruction::Instruction's constructor.
+ */
+void Analyzer::register_instruction(
+    const std::string &name,
+    const std::string &param_types,
+    bool allow_conditional,
+    bool allow_parallel,
+    bool allow_reused_qubits
+) {
+    register_instruction(instruction::Instruction(
+        name, param_types, allow_conditional, allow_parallel, allow_reused_qubits));
+}
+
+/**
+ * Registers an error model. If you never call this, error models are not
+ * resolved (i.e. anything goes name- and operand type-wise). Once you
+ * do, only error models with signatures as added are legal, so anything
+ * that doesn't match returns an error.
+ */
+void Analyzer::register_error_model(const error_model::ErrorModel &error_model) {
+    resolve_error_model = true;
+    error_models.add(error_model);
+}
+
+/**
+ * Convenience method for registering an error model. The arguments
+ * are passed straight to error_model::ErrorModel's constructor.
+ */
+void Analyzer::register_error_model(
+    const std::string &name,
+    const std::string &param_types
+) {
+    register_error_model(error_model::ErrorModel(name, param_types));
+}
 
 /**
  * Scope information.
@@ -622,7 +726,12 @@ values::Value AnalyzerHelper::analyze_matrix(const ast::MatrixLiteral &matrix_li
     // Note that the number of rows is always at least 1 (Many vs Any) so
     // the ncols line is well-behaved.
     size_t nrows = matrix_lit.rows.size();
-    size_t ncols = matrix_lit.rows[0].size();
+    size_t ncols = matrix_lit.rows[0]->items.size();
+    for (auto row : matrix_lit.rows) {
+        if (row->items.size() != ncols) {
+            throw error::AnalysisError("matrix is not rectangular");
+        }
+    }
     std::vector<values::Value> vals;
     for (size_t row = 0; row < nrows; row++) {
         for (size_t col = 0; col < ncols; col++) {
@@ -674,6 +783,8 @@ values::Value AnalyzerHelper::analyze_matrix_helper(
                 } else {
                     return values::Value();
                 }
+            } else {
+                return values::Value();
             }
         }
     }

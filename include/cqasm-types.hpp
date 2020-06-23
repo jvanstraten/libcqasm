@@ -19,9 +19,10 @@ using Types = tree::Any<TypeBase>;
  * Constructs a set of types from a shorthand string representation. In it,
  * each character represents one type. The supported characters are as follows:
  *
- *  - q = qubit
- *  - a = axis (x, y, or z)
+ *  - Q = qubit
+ *  - B = assignable bit/boolean (measurement register)
  *  - b = bit/boolean
+ *  - a = axis (x, y, or z)
  *  - i = integer
  *  - r = real
  *  - c = complex
@@ -29,6 +30,9 @@ using Types = tree::Any<TypeBase>;
  *        the parameter list (automatically deduced)
  *  - s = (quoted) string
  *  - j = json
+ *
+ * In general, lowercase means the parameter is only read and can thus be a
+ * constant, while uppercase means it is mutated.
  *
  * Note that complex matrices with different constraints and real matrices of
  * any kind cannot be specified this way. You'll have to construct and add

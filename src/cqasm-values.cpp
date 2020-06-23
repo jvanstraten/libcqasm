@@ -1,5 +1,6 @@
 #include <cqasm-parse-helper.hpp>
 #include "cqasm-values.hpp"
+#include "cqasm-error.hpp"
 
 namespace cqasm {
 namespace values {
@@ -220,6 +221,27 @@ types::Types types_of(const Values &values) {
     }
     return types;
 }
+
+/**
+ * Throws an AnalysisError if the given value is not a constant, i.e. if it
+ * doesn't have a known value at this time.
+ */
+void check_const(const Value &value) {
+    if (!value->as_constant()) {
+        throw error::AnalysisError("dynamic values are not supported here", &*value);
+    }
+}
+
+/**
+ * Throws an AnalysisError if any of the given values are not a constant, i.e.
+ * if it doesn't have a known value at this time.
+ */
+void check_const(const Values &values) {
+    for (auto value : values) {
+        check_const(value);
+    }
+}
+
 
 } // namespace values
 } // namespace cqasm

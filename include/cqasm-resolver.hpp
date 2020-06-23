@@ -77,7 +77,7 @@ public:
      * value list it gets is of the right size and the values are of the right
      * types.
      */
-    void add(const std::string &name, const FunctionImpl &impl, const types::Types &param_types);
+    void add(const std::string &name, const types::Types &param_types, const FunctionImpl &impl);
 
     /**
      * Calls a function. Throws NameResolutionFailure if no function by the

@@ -35,6 +35,18 @@ types::Type type_of(const Value &value);
  */
 types::Types types_of(const Values &values);
 
+/**
+ * Throws an AnalysisError if the given value is not a constant, i.e. if it
+ * doesn't have a known value at this time.
+ */
+void check_const(const Value &value);
+
+/**
+ * Throws an AnalysisError if any of the given values are not a constant, i.e.
+ * if it doesn't have a known value at this time.
+ */
+void check_const(const Values &values);
+
 } // namespace values
 } // namespace cqasm
 

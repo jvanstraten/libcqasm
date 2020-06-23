@@ -111,7 +111,7 @@ public:
             bool ok = true;
             for (size_t i = 0; i < args.size(); i++) {
                 auto promoted_arg = promote(args.at(i), overload.param_type_at(i));
-                if (!promoted_arg.empty()) {
+                if (promoted_arg.empty()) {
                     ok = false;
                     break;
                 }
@@ -174,9 +174,9 @@ public:
             try {
                 return entry->second.resolve(args);
             } catch (OverloadResolutionFailure &e) {
-                e.message.clear();
+                e.message = std::ostringstream();
                 e.message << "failed to resolve overload for " << name;
-                e.message << "with argument pack " << values::types_of(args);
+                e.message << " with argument pack " << values::types_of(args);
                 throw;
             }
         }
@@ -207,7 +207,7 @@ FunctionTable& FunctionTable::operator=(FunctionTable&& t) {
  * value list it gets is of the right size and the values are of the right
  * types.
  */
-void FunctionTable::add(const std::string &name, const FunctionImpl &impl, const Types &param_types) {
+void FunctionTable::add(const std::string &name, const Types &param_types, const FunctionImpl &impl) {
     resolver->add_overload(name, impl, param_types);
 }
 

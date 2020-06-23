@@ -89,6 +89,76 @@ private:
 public:
 
     /**
+     * Creates a new semantic analyzer.
+     */
+    Analyzer();
+
+    /**
+     * Registers an initial mapping from the given name to the given value.
+     */
+    void register_mapping(const std::string &name, const values::Value &value);
+
+    /**
+     * Registers a function, usable within expressions.
+     */
+    void register_function(
+        const std::string &name,
+        const types::Types &param_types,
+        const resolver::FunctionImpl &impl);
+
+    /**
+     * Convenience method for registering a function. The param_types are
+     * specified as a string, converted to types::Types for the other overload
+     * using types::from_spec.
+     */
+    void register_function(
+        const std::string &name,
+        const std::string &param_types,
+        const resolver::FunctionImpl &impl);
+
+    /**
+     * Registers a number of default functions and mappings, such as the
+     * operator functions, the usual trigonometric functions, mappings for pi,
+     * eu (aka e, 2.718...), im (imaginary unit) and so on.
+     */
+    void register_default_functions_and_mappings();
+
+    /**
+     * Registers an instruction type. If you never call this, instructions are
+     * not resolved (i.e. anything goes name- and operand type-wise). Once you
+     * do, only instructions with signatures as added are legal, so anything
+     * that doesn't match returns an error.
+     */
+    void register_instruction(const instruction::Instruction &instruction);
+
+    /**
+     * Convenience method for registering an instruction type. The arguments
+     * are passed straight to instruction::Instruction's constructor.
+     */
+    void register_instruction(
+        const std::string &name,
+        const std::string &param_types = "",
+        bool allow_conditional = true,
+        bool allow_parallel = true,
+        bool allow_reused_qubits = false);
+
+    /**
+     * Registers an error model. If you never call this, error models are not
+     * resolved (i.e. anything goes name- and operand type-wise). Once you
+     * do, only error models with signatures as added are legal, so anything
+     * that doesn't match returns an error.
+     */
+    void register_error_model(const error_model::ErrorModel &error_model);
+
+    /**
+     * Convenience method for registering an error model. The arguments
+     * are passed straight to error_model::ErrorModel's constructor.
+     */
+    void register_error_model(
+        const std::string &name,
+        const std::string &param_types = "");
+
+    /**
      * Analyzes the given program AST node.
      */
     AnalysisResult analyze(const ast::Program &program) const;

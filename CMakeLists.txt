@@ -33,11 +33,6 @@ set(FLEX_VERSION_REQUIRED 2.6.1)
 set(BISON_VERSION_REQUIRED 3.0)
 include(cmake/flex-bison.cmake)
 
-# Include tree-gen, a custom utility to generate classes for typed tree-like
-# structures and enums with variants containing data. This exposes the
-# generate_tree() function.
-add_subdirectory(tree-gen)
-
 # Generate the lexer.
 flex_target(
     cqasm-lexer
@@ -60,6 +55,11 @@ add_flex_bison_dependency(
     cqasm-lexer
     cqasm-parser
 )
+
+# Include tree-gen, a custom utility to generate classes for typed tree-like
+# structures and enums with variants containing data. This exposes the
+# generate_tree() function.
+add_subdirectory(tree-gen)
 
 # Generate the abstract syntax tree classes.
 generate_tree(
@@ -91,6 +91,20 @@ generate_tree(
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-semantic-gen.cpp"
 )
 
+# Include func-gen, a simple program that generates the function that registers
+# all default functions (operators, trigonometry, etc) with a
+# resolver::FunctionTable object. This file would otherwise be extremely
+# repetitive and annoying to maintain due to the amount of overloads. This
+# exposes the generate_funcs() function, which should be called once with the
+# header and source file paths.
+add_subdirectory(func-gen)
+
+# Generate the cQASM default function set.
+generate_funcs(
+    "${CMAKE_CURRENT_BINARY_DIR}/include/cqasm-functions-gen.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-functions-gen.cpp"
+)
+
 # Main cQASM library.
 add_library(
     cqasm
@@ -100,6 +114,7 @@ add_library(
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-types-gen.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-values-gen.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-semantic-gen.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/cqasm-functions-gen.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-error.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-primitives.cpp"

@@ -65,6 +65,12 @@ Types from_spec(const std::string &spec) {
                 types.add_raw(new types::ComplexMatrix(
                     1ull << num_qubits, 1ull << num_qubits, assignable));
                 break;
+            case 'm':
+                types.add_raw(new types::RealMatrix(-1, -1, assignable));
+                break;
+            case 'n':
+                types.add_raw(new types::ComplexMatrix(-1, -1, assignable));
+                break;
             case 's':
                 types.add_raw(new types::String(assignable));
                 break;
@@ -81,14 +87,62 @@ Types from_spec(const std::string &spec) {
 } // namespace types
 } // namespace cqasm
 
+static void mat_size(std::ostream& os, ssize_t nrows, ssize_t ncols) {
+    if (ncols == 0) {
+        os << "empty matrix";
+    } else if (nrows == 1) {
+        os << ncols << "-dimensional vector";
+    } else {
+        if (nrows < 0) {
+            os << "*";
+        } else {
+            os << nrows;
+        }
+        os << "-by-";
+        if (ncols < 0) {
+            os << "*";
+        } else {
+            os << ncols;
+        }
+        os << " matrix";
+    }
+}
+
 /**
  * Stream << overload for a single type.
  */
 std::ostream& operator<<(std::ostream& os, const ::cqasm::types::Type& type) {
     if (type.empty()) {
-        os << "NULL";
+        os << "!EMPTY";
+    } else if (type->as_bool()) {
+        os << "bool/bit";
+    } else if (type->as_axis()) {
+        os << "axis";
+    } else if (type->as_int()) {
+        os << "int";
+    } else if (type->as_real()) {
+        os << "real";
+    } else if (type->as_complex()) {
+        os << "complex";
+    } else if (auto real_mat = type->as_real_matrix()) {
+        os << "real ";
+        mat_size(os, real_mat->num_rows, real_mat->num_cols);
+    } else if (auto complex_mat = type->as_complex_matrix()) {
+        os << "complex ";
+        mat_size(os, complex_mat->num_rows, complex_mat->num_cols);
+    } else if (type->as_string()) {
+        os << "string";
+    } else if (type->as_json()) {
+        os << "json";
+    } else if (type->as_qubit()) {
+        os << "qubit";
     } else {
+        // Fallback when no friendly repr is known.
         os << *type;
+        return os;
+    }
+    if (type->assignable) {
+        os << " reference";
     }
     return os;
 }
@@ -97,7 +151,7 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::types::Type& type) {
  * Stream << overload for zero or more types.
  */
 std::ostream& operator<<(std::ostream& os, const ::cqasm::types::Types& types) {
-    os << "[";
+    os << "(";
     bool first = true;
     for (const auto &type : types) {
         if (first) {
@@ -105,12 +159,8 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::types::Types& types) {
         } else {
             os << ", ";
         }
-        if (type) {
-            os << *type;
-        } else {
-            os << "NULL";
-        }
+        os << type;
     }
-    os << "]";
+    os << ")";
     return os;
 }
