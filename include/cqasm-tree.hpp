@@ -202,13 +202,6 @@ public:
     }
 
     /**
-     * Boolean operator, returns whether this Maybe is filled.
-     */
-    operator bool() const {
-        return val != nullptr;
-    }
-
-    /**
      * Returns whether this Maybe is empty.
      */
     size_t size() const {
@@ -398,7 +391,7 @@ public:
      */
     template <class S>
     void add(const Maybe<S> &ob, ssize_t pos=-1) {
-        if (!ob) {
+        if (ob.empty()) {
             return;
         }
         if (pos < 0 || (size_t)pos >= size()) {
@@ -576,7 +569,7 @@ public:
     template <class V>
     void visit(V &visitor) {
         for (auto &sptr : this->vec) {
-            if (sptr) {
+            if (!sptr.empty()) {
                 sptr->visit(visitor);
             }
         }

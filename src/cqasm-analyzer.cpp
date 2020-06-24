@@ -275,7 +275,11 @@ public:
  * Analyzes the given AST.
  */
 AnalysisResult Analyzer::analyze(const ast::Program &ast) const {
-    return AnalyzerHelper(*this, ast).result;
+    auto result = AnalyzerHelper(*this, ast).result;
+    if (result.errors.empty() && !result.root.is_complete()) {
+        throw std::runtime_error("internal error: no semantic errors returned, but semantic tree is incomplete");
+    }
+    return result;
 }
 
 /**
@@ -401,6 +405,31 @@ void AnalyzerHelper::analyze_bundle(const ast::Bundle &bundle) {
             node->items.add(analyze_instruction(*insn));
         }
 
+        // If we have more than two instructions, ensure that all instructions
+        // are parallelizable.
+        if (node->items.size() > 1) {
+            for (const auto &insn : node->items) {
+                try {
+                    if (!insn->instruction.empty()) {
+                        if (!insn->instruction->allow_parallel) {
+                            std::ostringstream ss;
+                            ss << "instruction ";
+                            ss << insn->instruction->name;
+                            ss << " with parameter pack ";
+                            ss << insn->instruction->param_types;
+                            ss << " is not parallelizable, but is bundled with ";
+                            ss << (node->items.size() - 1);
+                            ss << " other instructions";
+                            throw error::AnalysisError(ss.str());
+                        }
+                    }
+                } catch (error::AnalysisError &e) {
+                    e.context(*insn);
+                    result.errors.push_back(e.get_message());
+                }
+            }
+        }
+
         // It's possible that no instructions end up being added, due to all
         // condition codes resolving to constant false. In that case the entire
         // bundle is removed.
@@ -458,8 +487,8 @@ tree::Maybe<semantic::Instruction> AnalyzerHelper::analyze_instruction(const ast
         }
 
         // Resolve the condition code.
-        if (insn.condition) {
-            if (node->instruction && !node->instruction->allow_conditional) {
+        if (!insn.condition.empty()) {
+            if (!node->instruction.empty() && !node->instruction->allow_conditional) {
                 throw error::AnalysisError(
                     "conditional execution is not supported for this instruction");
             }
@@ -479,14 +508,14 @@ tree::Maybe<semantic::Instruction> AnalyzerHelper::analyze_instruction(const ast
         }
 
         // Enforce qubit uniqueness if the instruction requires us to.
-        if (node->instruction && !node->instruction->allow_reused_qubits) {
+        if (!node->instruction.empty() && !node->instruction->allow_reused_qubits) {
             std::unordered_set<primitives::Int> qubits_used;
             for (const auto &operand : operands) {
                 if (auto x = operand->as_qubit_refs()) {
                     for (auto index : x->index) {
-                        if (!qubits_used.insert(index).second) {
+                        if (!qubits_used.insert(index->value).second) {
                             throw error::AnalysisError(
-                                "qubit with index " + std::to_string(index)
+                                "qubit with index " + std::to_string(index->value)
                                 + " is used more than once");
                         }
                     }
@@ -592,7 +621,7 @@ void AnalyzerHelper::analyze_mapping(const ast::Mapping &mapping) {
 void AnalyzerHelper::analyze_subcircuit(const ast::Subcircuit &subcircuit) {
     try {
         primitives::Int iterations = 1;
-        if (subcircuit.iterations) {
+        if (!subcircuit.iterations.empty()) {
             iterations = analyze_as_const_int(*subcircuit.iterations);
             if (iterations < 1) {
                 throw error::AnalysisError(
@@ -687,7 +716,7 @@ values::Value AnalyzerHelper::analyze_expression(const ast::Expression &expressi
         e.context(expression);
         throw;
     }
-    if (!retval) {
+    if (retval.empty()) {
         throw std::runtime_error(
             "analyze_expression returned nonsense, this should never happen");
     }
@@ -744,7 +773,7 @@ values::Value AnalyzerHelper::analyze_matrix(const ast::MatrixLiteral &matrix_li
         types::Real, values::ConstReal,
         primitives::RMatrix, values::ConstRealMatrix
     >(nrows, ncols, vals);
-    if (value) {
+    if (!value.empty()) {
         return value;
     }
 
@@ -753,7 +782,7 @@ values::Value AnalyzerHelper::analyze_matrix(const ast::MatrixLiteral &matrix_li
         types::Complex, values::ConstComplex,
         primitives::CMatrix, values::ConstComplexMatrix
     >(nrows, ncols, vals);
-    if (value) {
+    if (!value.empty()) {
         return value;
     }
 
@@ -777,14 +806,16 @@ values::Value AnalyzerHelper::analyze_matrix_helper(
     auto matrix = MatLit(nrows, ncols);
     for (size_t row = 0; row < nrows; row++) {
         for (size_t col = 0; col < ncols; col++) {
-            if (auto val = values::promote(vals[row * ncols + col], tree::make<ElType>())) {
-                if (auto val_real = val.template as<ElVal>()) {
-                    matrix.at(row + 1, col + 1) = val_real->value;
-                } else {
-                    return values::Value();
-                }
-            } else {
+            auto val = values::promote(vals[row * ncols + col], tree::make<ElType>());
+            if (val.empty()) {
                 return values::Value();
+            } else {
+                auto val_real = val.template as<ElVal>();
+                if (val_real.empty()) {
+                    return values::Value();
+                } else {
+                    matrix.at(row + 1, col + 1) = val_real->value;
+                }
             }
         }
     }
@@ -889,7 +920,7 @@ values::Value AnalyzerHelper::analyze_function(const ast::Identifier &name, cons
         arg_values.add(analyze_expression(*arg));
     }
     auto retval = scope.functions.call(name.name, arg_values);
-    if (!retval) {
+    if (retval.empty()) {
         throw std::runtime_error("function implementation returned empty value");
     }
     return retval;

@@ -554,7 +554,7 @@ static void generate_dumper_class(
                         source << "        out << \"<\" << std::endl;" << std::endl;
                         source << "        indent++;" << std::endl;
                         if (child.type == Prim) {
-                            source << "        if (node." << child.name << ") {" << std::endl;
+                            source << "        if (!node." << child.name << ".empty()) {" << std::endl;
                             source << "            node." << child.name << "->dump(out, indent);" << std::endl;
                             source << "        }" << std::endl;
                         } else {
@@ -578,7 +578,7 @@ static void generate_dumper_class(
                         source << "        out << \"[\" << std::endl;" << std::endl;
                         source << "        indent++;" << std::endl;
                         source << "        for (auto &sptr : node." << child.name << ") {" << std::endl;
-                        source << "            if (sptr) {" << std::endl;
+                        source << "            if (!sptr.empty()) {" << std::endl;
                         if (child.type == Prim) {
                             source << "                sptr->dump(out, indent);" << std::endl;
                         } else {

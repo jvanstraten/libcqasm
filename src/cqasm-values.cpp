@@ -167,7 +167,7 @@ Value promote(const Value &value, const types::Type &type) {
     }
 
     // Copy source location annotations into the new object.
-    if (retval) {
+    if (!retval.empty()) {
         retval->copy_annotation<parser::SourceLocation>(*value);
     }
 
@@ -270,10 +270,10 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::values::Values& values
         } else {
             os << ", ";
         }
-        if (value) {
-            os << *value;
-        } else {
+        if (value.empty()) {
             os << "NULL";
+        } else {
+            os << *value;
         }
     }
     os << "]";

@@ -55,10 +55,10 @@ std::ostream& operator<<(std::ostream& os, const ::cqasm::instruction::Instructi
  * Stream << overload for instruction references.
  */
 std::ostream& operator<<(std::ostream& os, const ::cqasm::instruction::InstructionRef& insn) {
-    if (insn) {
-        os << *insn;
-    } else {
+    if (insn.empty()) {
         os << "unresolved";
+    } else {
+        os << *insn;
     }
     return os;
 }

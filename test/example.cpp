@@ -2,7 +2,7 @@
 
 #include <cqasm.hpp>
 
-TEST(test, test) {
+TEST(example, grover) {
     auto r = cqasm::parser::parse_file("grover.cq");
     EXPECT_TRUE(r.root.is_complete());
     for (auto err : r.errors) {

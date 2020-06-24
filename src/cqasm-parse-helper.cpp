@@ -13,6 +13,13 @@ ParseResult parse_file(const std::string &filename) {
 }
 
 /**
+ * Parse using the given file pointer.
+ */
+ParseResult parse_file(FILE *file, const std::string &filename) {
+    return std::move(ParseHelper(filename, file).result);
+}
+
+/**
  * Parse the given string. A filename may be given in addition for use within
  * error messages.
  */
@@ -21,24 +28,19 @@ ParseResult parse_string(const std::string &data, const std::string &filename) {
 }
 
 /**
- * Construct the analyzer internals for the given filename, and analyze
- * the file.
+ * Parse a string or file with flex/bison. If use_file is set, the file
+ * specified by filename is read and data is ignored. Otherwise, filename
+ * is used only for error messages, and data is read instead. Don't use
+ * this directly, use parse().
  */
 ParseHelper::ParseHelper(
     const std::string &filename,
     const std::string &data,
     bool use_file
 ) : filename(filename) {
-    int retcode;
 
     // Create the scanner.
-    retcode = yylex_init((yyscan_t*)&scanner);
-    if (retcode) {
-        std::ostringstream sb;
-        sb << "Failed to construct scanner: " << strerror(retcode);
-        push_error(sb.str());
-        return;
-    }
+    if (!construct()) return;
 
     // Open the file or pass the data buffer to flex.
     if (use_file) {
@@ -56,7 +58,50 @@ ParseHelper::ParseHelper(
     }
 
     // Do the actual parsing.
-    retcode = yyparse((yyscan_t)scanner, *this);
+    parse();
+
+}
+
+/**
+ * Construct the analyzer internals for the given filename, and analyze
+ * the file.
+ */
+ParseHelper::ParseHelper(
+    const std::string &filename,
+    FILE *fptr
+) : filename(filename) {
+
+    // Create the scanner.
+    if (!construct()) return;
+
+    // Open the file or pass the data buffer to flex.
+    yyset_in(fptr, (yyscan_t)scanner);
+
+    // Do the actual parsing.
+    parse();
+
+}
+
+/**
+ * Initializes the scanner. Returns whether this was successful.
+ */
+bool ParseHelper::construct() {
+    int retcode = yylex_init((yyscan_t*)&scanner);
+    if (retcode) {
+        std::ostringstream sb;
+        sb << "Failed to construct scanner: " << strerror(retcode);
+        push_error(sb.str());
+        return false;
+    } else {
+        return true;
+    }
+}
+
+/**
+ * Does the actual parsing.
+ */
+void ParseHelper::parse() {
+    int retcode = yyparse((yyscan_t) scanner, *this);
     if (retcode == 2) {
         std::ostringstream sb;
         sb << "Out of memory while parsing " << filename;
@@ -68,7 +113,9 @@ ParseHelper::ParseHelper(
         push_error(sb.str());
         return;
     }
-
+    if (result.errors.empty() && !result.root.is_complete()) {
+        throw std::runtime_error("internal error: no parse errors returned, but AST is incomplete");
+    }
 }
 
 /**

@@ -33,6 +33,11 @@ public:
 ParseResult parse_file(const std::string &filename);
 
 /**
+ * Parse using the given file pointer.
+ */
+ParseResult parse_file(FILE *file, const std::string &filename = "<unknown>");
+
+/**
  * Parse the given string. A filename may be given in addition for use within
  * error messages.
  */
@@ -71,6 +76,7 @@ public:
 
 private:
     friend ParseResult parse_file(const std::string &filename);
+    friend ParseResult parse_file(FILE *file, const std::string &filename);
     friend ParseResult parse_string(const std::string &data, const std::string &filename);
 
     /**
@@ -80,6 +86,22 @@ private:
      * this directly, use parse().
      */
     ParseHelper(const std::string &filename, const std::string &data, bool use_file);
+
+    /**
+     * Construct the analyzer internals for the given filename, and analyze
+     * the file.
+     */
+    ParseHelper(const std::string &filename, FILE *fptr);
+
+    /**
+     * Initializes the scanner. Returns whether this was successful.
+     */
+    bool construct();
+
+    /**
+     * Does the actual parsing.
+     */
+    void parse();
 
 public:
 

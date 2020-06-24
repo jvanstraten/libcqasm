@@ -104,7 +104,8 @@ public:
     void register_function(
         const std::string &name,
         const types::Types &param_types,
-        const resolver::FunctionImpl &impl);
+        const resolver::FunctionImpl &impl
+    );
 
     /**
      * Convenience method for registering a function. The param_types are
@@ -114,7 +115,8 @@ public:
     void register_function(
         const std::string &name,
         const std::string &param_types,
-        const resolver::FunctionImpl &impl);
+        const resolver::FunctionImpl &impl
+    );
 
     /**
      * Registers a number of default functions and mappings, such as the
@@ -140,7 +142,33 @@ public:
         const std::string &param_types = "",
         bool allow_conditional = true,
         bool allow_parallel = true,
-        bool allow_reused_qubits = false);
+        bool allow_reused_qubits = false
+    );
+
+    /**
+     * Convenience method for registering an instruction type with a single
+     * user-specified annotation. The arguments are passed straight to
+     * instruction::Instruction's constructor and set_annotation.
+     */
+    template <typename T>
+    void register_instruction_with_annotation(
+        T &&annotation,
+        const std::string &name,
+        const std::string &param_types = "",
+        bool allow_conditional = true,
+        bool allow_parallel = true,
+        bool allow_reused_qubits = false
+    ) {
+        instruction::Instruction insn {
+            name,
+            param_types,
+            allow_conditional,
+            allow_parallel,
+            allow_reused_qubits
+        };
+        insn.set_annotation<T>(std::forward<T>(annotation));
+        register_instruction(insn);
+    }
 
     /**
      * Registers an error model. If you never call this, error models are not
@@ -156,7 +184,27 @@ public:
      */
     void register_error_model(
         const std::string &name,
-        const std::string &param_types = "");
+        const std::string &param_types = ""
+    );
+
+    /**
+     * Convenience method for registering an error model with a single
+     * user-specified annotation. The arguments are passed straight to
+     * instruction::Instruction's constructor and set_annotation.
+     */
+    template <typename T>
+    void register_error_model_with_annotation(
+        T &&annotation,
+        const std::string &name,
+        const std::string &param_types = ""
+    ) {
+        error_model::ErrorModel model {
+            name,
+            param_types
+        };
+        model.set_annotation<T>(std::forward<T>(annotation));
+        register_error_model(model);
+    }
 
     /**
      * Analyzes the given program AST node.

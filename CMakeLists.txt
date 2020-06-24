@@ -137,6 +137,7 @@ target_include_directories(
     cqasm
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat"
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
     PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/include"
 )
