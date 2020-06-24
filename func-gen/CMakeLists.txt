@@ -28,7 +28,7 @@ function(generate_funcs HDR SRC)
     add_custom_command(
         COMMAND func-gen "${HDR}" "${SRC}"
         OUTPUT "${HDR}" "${SRC}"
-        DEPENDS $<TARGET_FILE:func-gen>
+        DEPENDS func-gen
     )
 
 endfunction()

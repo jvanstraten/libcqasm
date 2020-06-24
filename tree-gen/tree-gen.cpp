@@ -24,19 +24,19 @@ static void format_doc(
         bool flush = false;
         if (c == '\n') {
             line << " " << word.str();
-            word = std::ostringstream();
+            word.str("");
             flush = true;
         } else if (c == ' ') {
             line << " " << word.str();
             line_empty = false;
-            word = std::ostringstream();
+            word.str("");
         } else {
             word << c;
             flush = !line_empty && line.str().size() + word.str().size() > 79;
         }
         if (flush) {
             stream << line.str() << std::endl;
-            line = std::ostringstream();
+            line.str("");
             line << indent << " *";
             line_empty = true;
         }
@@ -659,6 +659,10 @@ int main(
         return 1;
     }
     auto nodes = specification.nodes;
+
+    // Clean up.
+    yylex_destroy(scanner);
+    fclose(fptr);
 
     // Open the output files.
     auto header = std::ofstream(std::string(argv[2]) + "/" + specification.header_filename);

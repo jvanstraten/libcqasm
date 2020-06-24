@@ -5,7 +5,8 @@ flex_target(
     tree-gen-lexer
     "${CMAKE_CURRENT_SOURCE_DIR}/lexer.l"
     "${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp"
-    DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/lexer.hpp"
+    COMPILE_FLAGS
+        "--header-file=${CMAKE_CURRENT_BINARY_DIR}/lexer.hpp"
 )
 
 # Generate the parser.
@@ -48,13 +49,11 @@ function(generate_tree TREE HDR SRC)
     get_filename_component(SRC_DIR "${SRC}" PATH)
     file(MAKE_DIRECTORY "${SRC_DIR}")
 
-    # Add a command to do the generation. Note the $<TARGET_FILE:tree-gen>
-    # dependency; this makes cmake correctly recompile the generator and
-    # regenerate the tree files with it if its source files change.
+    # Add a command to do the generation.
     add_custom_command(
         COMMAND tree-gen "${TREE}" "${HDR_DIR}" "${SRC_DIR}"
         OUTPUT "${HDR}" "${SRC}"
-        DEPENDS "${TREE}" $<TARGET_FILE:tree-gen>
+        DEPENDS "${TREE}" tree-gen
     )
 
 endfunction()

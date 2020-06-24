@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.11 FATAL_ERROR)
-if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.0)
+if(CMAKE_VERSION VERSION_GREATER 3.0)
     CMAKE_POLICY(SET CMP0048 NEW)
 endif()
 
@@ -39,7 +39,8 @@ flex_target(
     cqasm-lexer
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cqasm-lexer.l"
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-lexer.cpp"
-    DEFINES_FILE "${CMAKE_CURRENT_BINARY_DIR}/cqasm-lexer.hpp"
+    COMPILE_FLAGS
+        "--header-file=${CMAKE_CURRENT_BINARY_DIR}/cqasm-lexer.hpp"
 )
 
 # Generate the parser.
@@ -143,7 +144,7 @@ target_include_directories(
 )
 
 # Enable all warnings and treat them as errors when compiling libcqasm.
-set_target_properties(cqasm_objlib PROPERTIES COMPILE_FLAGS "-Wall -Wextra -Werror")
+set_target_properties(cqasm_objlib PROPERTIES COMPILE_FLAGS "-Wall -Wextra")
 
 # Always compiled with -fPIC, otherwise some weirdness happens with pthreads or
 # something when linking statically.
