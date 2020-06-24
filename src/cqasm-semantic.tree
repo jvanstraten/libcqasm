@@ -101,6 +101,17 @@ annotated {
 
     }
 
+    # A mappings. That is, a user-defined identifier mapping to some value.
+    mapping {
+
+        # The name of the mapping.
+        name: cqasm::primitives::Str;
+
+        # The value it maps to.
+        value: external One<cqasm::values::Node>;
+
+    }
+
 }
 
 # The file version identifier.
@@ -125,5 +136,8 @@ program {
 
     # The list of subcircuit.
     subcircuits: Any<subcircuit>;
+
+    # The list of all user-defined mappings after parsing.
+    mappings: Any<mapping>;
 
 }

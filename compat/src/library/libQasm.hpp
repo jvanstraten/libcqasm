@@ -1,4 +1,4 @@
-#ifndef LIBQASM_HPP
+ #ifndef LIBQASM_HPP
 #define LIBQASM_HPP
 // This is a simple interface for the python checker
 

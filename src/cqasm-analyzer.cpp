@@ -1,5 +1,4 @@
 #include <unordered_set>
-#include <math.h>
 #include "cqasm-analyzer.hpp"
 #include "cqasm-parse-helper.hpp"
 #include "cqasm-utils.hpp"
@@ -277,7 +276,8 @@ public:
 AnalysisResult Analyzer::analyze(const ast::Program &ast) const {
     auto result = AnalyzerHelper(*this, ast).result;
     if (result.errors.empty() && !result.root.is_complete()) {
-        throw std::runtime_error("internal error: no semantic errors returned, but semantic tree is incomplete");
+        std::cerr << *result.root;
+        throw std::runtime_error("internal error: no semantic errors returned, but semantic tree is incomplete. Tree was dumped.");
     }
     return result;
 }
@@ -321,6 +321,30 @@ AnalyzerHelper::AnalyzerHelper(
                 e.context(*stmt);
                 result.errors.push_back(e.get_message());
             }
+        }
+
+        // Save the list of final mappings.
+        for (auto it : scope.mappings.get_table()) {
+            const auto &name = it.first;
+            const auto &value = it.second.first;
+            const auto &ast_node = it.second.second;
+
+            // Ignore predefined and implicit mappings.
+            if (ast_node.empty()) {
+                continue;
+            }
+
+            // Analyze any annotations attached to the mapping.
+            auto annotations = analyze_annotations(it.second.second->annotations);
+
+            // Construct the mapping object and copy the source location.
+            auto mapping = tree::make<semantic::Mapping>(
+                name, value,
+                analyze_annotations(it.second.second->annotations)
+            );
+            result.root->copy_annotation<parser::SourceLocation>(*ast_node);
+            result.root->mappings.add(mapping);
+
         }
 
     } catch (error::AnalysisError &e) {
@@ -446,9 +470,9 @@ void AnalyzerHelper::analyze_bundle(const ast::Bundle &bundle) {
         // empty) and used the name "default" vs. the otherwise invalid empty
         // string.
         if (result.root->subcircuits.empty()) {
-            auto node = tree::make<semantic::Subcircuit>("", 1);
-            node->copy_annotation<parser::SourceLocation>(bundle);
-            result.root->subcircuits.add(node);
+            auto subcircuit_node = tree::make<semantic::Subcircuit>("", 1);
+            subcircuit_node->copy_annotation<parser::SourceLocation>(bundle);
+            result.root->subcircuits.add(subcircuit_node);
         }
 
         // Add the node to the last subcircuit.
@@ -556,7 +580,7 @@ void AnalyzerHelper::analyze_error_model(const ast::Instruction &insn) {
 
         // Figure out the name of the error model.
         const auto &arg_exprs = insn.operands->items;
-        if (arg_exprs.size() < 1) {
+        if (arg_exprs.empty()) {
             throw error::AnalysisError("missing error model name");
         }
         std::string name;
@@ -606,7 +630,11 @@ void AnalyzerHelper::analyze_error_model(const ast::Instruction &insn) {
  */
 void AnalyzerHelper::analyze_mapping(const ast::Mapping &mapping) {
     try {
-        scope.mappings.add(mapping.alias->name, analyze_expression(*mapping.expr));
+        scope.mappings.add(
+            mapping.alias->name,
+            analyze_expression(*mapping.expr),
+            tree::make<ast::Mapping>(mapping)
+        );
     } catch (error::AnalysisError &e) {
         e.context(mapping);
         result.errors.push_back(e.get_message());

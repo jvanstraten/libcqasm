@@ -11,11 +11,19 @@ using Types = types::Types;
 using Value = values::Value;
 using Values = values::Values;
 
+
 /**
  * Adds a mapping.
  */
-void MappingTable::add(const std::string &name, const Value &value) {
-    table.insert(std::make_pair(utils::lowercase(name), value));
+void MappingTable::add(
+    const std::string &name,
+    const values::Value &value,
+    const tree::Maybe<ast::Mapping> &node
+) {
+    table.insert(
+        std::make_pair(utils::lowercase(name),
+        std::pair<const values::Value, tree::Maybe<ast::Mapping>>(value, node))
+    );
 }
 
 /**
@@ -27,8 +35,15 @@ Value MappingTable::resolve(const std::string &name) const {
     if (entry == table.end()) {
         throw NameResolutionFailure("failed to resolve " + name);
     } else {
-        return Value(entry->second->clone());
+        return Value(entry->second.first->clone());
     }
+}
+
+/**
+ * Grants read access to the underlying map.
+ */
+const std::unordered_map<std::string, std::pair<const values::Value, tree::Maybe<ast::Mapping>>> &MappingTable::get_table() const {
+    return table;
 }
 
 /**

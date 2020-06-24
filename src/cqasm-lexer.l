@@ -90,6 +90,7 @@
 }
 <INITIAL>{
 
+
     /*=======================================================================*/
     /* KEYWORDS                                                              */
     /*=======================================================================*/
@@ -102,6 +103,11 @@
 
     /* C-dash prefix for binary-controlled gates */
 [cC]-/[a-zA-Z_]                                     WITHOUT_STR(CDASH);
+
+    /* Absolute nonsense for compatibility purposes: the reset-averaging */
+    /* operation has a - in it, which is not legal in an identifier for */
+    /* obvious reasons when expressions come along. */
+(?i:reset-averaging)                                WITH_STR(IDENTIFIER);
 
 
     /*=======================================================================*/

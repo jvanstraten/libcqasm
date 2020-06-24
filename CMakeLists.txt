@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 2.8.11 FATAL_ERROR)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.0)
+    CMAKE_POLICY(SET CMP0048 NEW)
+endif()
+
 project(libcqasm CXX)
 
 # Library type option. Default is a static library.
 option(
     BUILD_SHARED_LIBS
-    "whether the library should be built as a shared object or as a static library"
+    "whether the cqasm library should be built as a shared object or as a static library"
     OFF
 )
 
@@ -24,9 +28,6 @@ else()
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CMAKE_CXX_EXTENSIONS ON)
 endif()
-
-# Enable all warnings.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 # Require flex/bison; if not installed, this will try to build from source.
 set(FLEX_VERSION_REQUIRED 2.6.1)
@@ -105,9 +106,9 @@ generate_funcs(
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-functions-gen.cpp"
 )
 
-# Main cQASM library.
+# Main cQASM library as an object library.
 add_library(
-    cqasm
+    cqasm_objlib OBJECT
     ${BISON_cqasm-parser_OUTPUTS}
     ${FLEX_cqasm-lexer_OUTPUTS}
     "${CMAKE_CURRENT_BINARY_DIR}/cqasm-ast-gen.cpp"
@@ -134,13 +135,25 @@ add_library(
 # must not try to include generated files and files from the src directory,
 # but the other direction is fine.
 target_include_directories(
-    cqasm
+    cqasm_objlib
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
     PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
-    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/compat"
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
     PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/include"
 )
+
+# Enable all warnings and treat them as errors when compiling libcqasm.
+set_target_properties(cqasm_objlib PROPERTIES COMPILE_FLAGS "-Wall -Wextra -Werror")
+
+# Always compiled with -fPIC, otherwise some weirdness happens with pthreads or
+# something when linking statically.
+set_target_properties(cqasm_objlib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# Main cQASM library in shared or static form as managed by cmake's
+# internal BUILD_SHARED_LIBS variable.
+add_library(cqasm $<TARGET_OBJECTS:cqasm_objlib>)
+target_include_directories(cqasm PUBLIC $<TARGET_PROPERTY:cqasm_objlib,INTERFACE_INCLUDE_DIRECTORIES>)
+target_link_libraries(cqasm PUBLIC $<TARGET_PROPERTY:cqasm_objlib,LINK_LIBRARIES>)
 
 # Add the test directory.
 if(BUILD_TESTS)

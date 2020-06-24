@@ -114,7 +114,8 @@ void ParseHelper::parse() {
         return;
     }
     if (result.errors.empty() && !result.root.is_complete()) {
-        throw std::runtime_error("internal error: no parse errors returned, but AST is incomplete");
+        std::cerr << *result.root;
+        throw std::runtime_error("internal error: no parse errors returned, but AST is incomplete. AST was dumped.");
     }
 }
 

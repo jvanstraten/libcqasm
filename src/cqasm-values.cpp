@@ -130,10 +130,10 @@ Value promote(const Value &value, const types::Type &type) {
                     if (mat_type->num_rows == mat_type->num_cols &&
                         mat_type->num_rows > 0) {
                         const size_t size = mat_type->num_rows;
-                        const size_t num_elements = 2ull << (2 * size);
+                        const size_t num_elements = 2 * size * size;
                         if (const_real_matrix->value.size_rows() == 1 && const_real_matrix->value.size_cols() == num_elements) {
                             cqasm::primitives::CMatrix complex_mat_value(size, size);
-                            size_t index = 0;
+                            size_t index = 1;
                             for (size_t row = 1; row <= size; row++) {
                                 for (size_t col = 1; col <= size; col++) {
                                     double re = const_real_matrix->value.at(1, index++);

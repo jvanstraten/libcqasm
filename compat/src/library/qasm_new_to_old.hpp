@@ -202,10 +202,7 @@ static void handle_parse_result(QasmRepresentation &qasm, cqasm::parser::ParseRe
 
     // Throw an error if parsing failed.
     if (!result.errors.empty()) {
-        for (auto error : result.errors) {
-            std::cerr << error << std::endl;
-        }
-        throw std::runtime_error("Could not parse qasm!");
+        throw std::runtime_error(result.errors[0]);
     }
 
     // Create the semantic analyzer.
@@ -242,16 +239,16 @@ static void handle_parse_result(QasmRepresentation &qasm, cqasm::parser::ParseRe
     REG(SingleQubit, "tdag", "Q");
     REG(SingleQubitMatrix, "u", "Qu");
     REG(SingleQubit, "prep", "Q", false);
-    REG(SingleQubit, "prepx", "Q", false);
-    REG(SingleQubit, "prepy", "Q", false);
-    REG(SingleQubit, "prepz", "Q", false);
+    REG(SingleQubit, "prep_x", "Q", false);
+    REG(SingleQubit, "prep_y", "Q", false);
+    REG(SingleQubit, "prep_z", "Q", false);
     REG(SingleQubit, "measure", "Q", false);
-    REG(SingleQubit, "measurex", "Q", false);
-    REG(SingleQubit, "measurey", "Q", false);
-    REG(SingleQubit, "measurez", "Q", false);
+    REG(SingleQubit, "measure_x", "Q", false);
+    REG(SingleQubit, "measure_y", "Q", false);
+    REG(SingleQubit, "measure_z", "Q", false);
     REG(SingleQubitReal, "rx", "Qr");
     REG(SingleQubitReal, "ry", "Qr");
-    REG(SingleQubitReal, "rx", "Qr");
+    REG(SingleQubitReal, "rz", "Qr");
     REG(TwoQubit, "cnot", "QQ");
     REG(TwoQubit, "cz", "QQ");
     REG(TwoQubit, "swap", "QQ");
@@ -273,19 +270,13 @@ static void handle_parse_result(QasmRepresentation &qasm, cqasm::parser::ParseRe
     // Run analysis.
     auto analysis_result = analyzer.analyze(*result.root->as_program());
     if (!analysis_result.errors.empty()) {
-        for (auto error : analysis_result.errors) {
-            std::cerr << error << std::endl;
-        }
-        throw std::runtime_error("Could not parse qasm!");
+        throw std::runtime_error(analysis_result.errors[0]);
     }
 
     // Convert the new parse tree to the old AST classes.
     // GENERAL NOTE: the new operators all over the place introduce
     //   memory leaks. This is legacy behavior intentionally kept
     //   for backward compatibility.
-    // GENERAL NOTE: because the old AST is no longer used to
-    //   resolve mappings, the (qu)bit mappings are not entered
-    //   into it.
 
     // Copy number of qubits.
     qasm.qubitRegister(analysis_result.root->num_qubits);
@@ -368,6 +359,15 @@ static void handle_parse_result(QasmRepresentation &qasm, cqasm::parser::ParseRe
             if (opclus) {
                 scs.lastSubCircuit().addOperationsCluster(opclus);
             }
+        }
+    }
+
+    // Copy mappings for as far as this is supported by the old API.
+    for (auto mapping : analysis_result.root->mappings) {
+        if (auto qubit_refs = mapping->value->as_qubit_refs()) {
+            qasm.addMappings(mapping->name, convert_indices(qubit_refs->index), true);
+        } else if (auto bit_refs = mapping->value->as_bit_refs()) {
+            qasm.addMappings(mapping->name, convert_indices(bit_refs->index), false);
         }
     }
 

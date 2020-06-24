@@ -25,13 +25,17 @@ CQASM_ANALYSIS_ERROR(OverloadResolutionFailure);
  */
 class MappingTable {
 private:
-    std::unordered_map<std::string, const values::Value> table;
+    std::unordered_map<std::string, std::pair<const values::Value, tree::Maybe<ast::Mapping>>> table;
 public:
 
     /**
      * Adds a mapping.
      */
-    void add(const std::string &name, const values::Value &value);
+    void add(
+        const std::string &name,
+        const values::Value &value,
+        const tree::Maybe<ast::Mapping> &node = tree::Maybe<ast::Mapping>()
+    );
 
     /**
      * Resolves a mapping. Throws NameResolutionFailure if no mapping by the
@@ -39,6 +43,10 @@ public:
      */
     values::Value resolve(const std::string &name) const;
 
+    /**
+     * Grants read access to the underlying map.
+     */
+    const std::unordered_map<std::string, std::pair<const values::Value, tree::Maybe<ast::Mapping>>> &get_table() const;
 };
 
 // Forward declaration for the name resolver template class. This class is

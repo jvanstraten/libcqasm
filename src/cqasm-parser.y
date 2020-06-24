@@ -334,7 +334,7 @@ Program         : OptNewline VERSION Version Newline
                     QUBITS Expression Newline
                     StatementList OptNewline                                    { NEW($$, Program); $$->version.set_raw($3); $$->num_qubits.set_raw($6); $$->statements.set_raw($8); }
                 | OptNewline VERSION Version Newline
-                    QUBITS Expression OptNewline                                { NEW($$, Program); $$->version.set_raw($3); $$->num_qubits.set_raw($6); }
+                    QUBITS Expression OptNewline                                { NEW($$, Program); $$->version.set_raw($3); $$->num_qubits.set_raw($6); $$->statements.set_raw(new StatementList()); }
                 ;
 
 /* Toplevel. */

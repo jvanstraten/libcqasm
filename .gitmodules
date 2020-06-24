@@ -1,0 +1,3 @@
+[submodule "compat/src/tests/cpp/doctest"]
+	path = compat/src/tests/cpp/doctest
+	url = https://github.com/onqtam/doctest.git

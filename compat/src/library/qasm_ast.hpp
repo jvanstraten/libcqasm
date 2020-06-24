@@ -676,7 +676,6 @@ namespace compiler
             void printMappings() const
             // This is just for debugging purposes
             {
-                std::cout << "NOTE: DEPRECATED. The actual mappings are unknown to this structure." << std::endl;
                 for (auto elem : mappings_)
                 {
                     std::cout << elem.first << ": ";
